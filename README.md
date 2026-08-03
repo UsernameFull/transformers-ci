@@ -22,7 +22,8 @@ transformers-main   完整镜像 huggingface/transformers:main（完整历史，
 
 - 整个仓库工作流默认 `contents: read`，仅 sync 与 keepalive job 单独获得写权限。
 - CI job 安装并执行上游代码，但没有仓库写权限，也不注入仓库密钥。
-- 推送使用临时 `GIT_ASKPASS` 脚本（位于 `$RUNNER_TEMP`，用后即删），不持久化凭据。
+- sync 推送使用 SSH deploy key（secret `TRANSFORMERS_SYNC_SSH_KEY`，密钥文件位于 `$RUNNER_TEMP`，用后即删，不持久化）。
+- keepalive 推送使用临时 `GIT_ASKPASS` 脚本（位于 `$RUNNER_TEMP`，用后即删）配合 `GITHUB_TOKEN`。
 
 ## 仓库变量（可选，批量生成时使用）
 
@@ -34,6 +35,12 @@ transformers-main   完整镜像 huggingface/transformers:main（完整历史，
 | `PYTHON_VERSION` | `3.12` |
 | `CI_TEST_PATH` | `tests/utils` |
 
+## 仓库 Secret
+
+| Secret | 用途 |
+| --- | --- |
+| `TRANSFORMERS_SYNC_SSH_KEY` | 推送镜像分支用的 SSH 私钥（对应仓库 writable deploy key） |
+
 ## 手动触发
 
 - `Transformers Sync and CI`：`force_ci=true` 时即使上游无变化也运行 CI；可覆盖测试路径与 Python 版本。
@@ -42,7 +49,9 @@ transformers-main   完整镜像 huggingface/transformers:main（完整历史，
 ## 分支规则建议
 
 - `main`：如启用 Ruleset，需为 `github-actions[bot]` 配置推送 `bypass`，或不对自动化仓库强制 PR。
-- `transformers-main`：严格镜像上游，仅允许 GitHub Actions force push；禁止人工修改或提交自定义文件（下次同步会覆盖）。
+- `transformers-main`：Ruleset `transformers-main mirror protection` 已生效（禁止创建/更新/删除/强推，bypass 仅授予仓库 writable deploy key）。
+
+> 注：个人（用户）仓库无法把 GitHub Actions 集成添加为 ruleset bypass actor（API 报 "must be part of the ruleset source or owner organization"），因此镜像推送采用 SSH deploy key 认证；迁移到组织仓库后可改用 GitHub Actions 集成 bypass。
 
 ## 首次验收
 
