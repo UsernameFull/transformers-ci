@@ -99,7 +99,12 @@ jobs:
     if: |
       needs.sync.outputs.changed == 'true' ||
       inputs.force_ci == true
-    runs-on: ubuntu-latest
+    runs-on: linux-aarch64-a2-8
+    container:
+      image: ascendai/cann:9.0.0-910b-ubuntu22.04-py3.11
+      env:
+        HF_ENDPOINT: https://hf-mirror.com
+        UV_NO_SYNC: 1
     permissions:
       contents: read
     env:
