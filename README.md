@@ -34,6 +34,9 @@ transformers-main   完整镜像 huggingface/transformers:main（完整历史，
 | `MIRROR_BRANCH` | `transformers-main` |
 | `PYTHON_VERSION` | `3.12` |
 | `CI_TEST_PATH` | `tests/utils` |
+| `HF_ENDPOINT` | `https://huggingface.co`（自托管 runner 若在受限网络，可设为 `https://hf-mirror.com`） |
+
+安装依赖为 `.[torch,testing,vision]`（vision extra 提供 torchvision，tests/utils 中的图像与导入测试需要）。
 
 ## 仓库 Secret
 
