@@ -36,7 +36,9 @@ transformers-main   完整镜像 huggingface/transformers:main（完整历史，
 | `CI_TEST_PATH` | `tests/utils` |
 | `HF_ENDPOINT` | `https://huggingface.co`（自托管 runner 若在受限网络，可设为 `https://hf-mirror.com`） |
 
-安装依赖为 `.[torch,testing,vision]`（vision extra 提供 torchvision，tests/utils 中的图像与导入测试需要）。
+安装依赖为 `.[torch,testing,vision]` + `librosa`（vision extra 提供 torchvision；`[audio]` extra 因 kenlm 无 aarch64 wheel 不能用于 ARM64 runner，librosa 满足 tests/utils 音频测试的回退解码）。
+
+> 已知环境特有失败：`test_qkv_chunk_rope_permute_with_fp8_quantization` 在 ARM64 CPU runner 上（triton 3.x 可用但 CPU 后端行为异常）会失败——上游测试假定 triton 在 GPU 上运行，属环境差异，非工作流问题。
 
 ## 仓库 Secret
 
