@@ -1,4 +1,4 @@
-name: Transformers Sync and CI
+﻿name: Transformers Sync and CI
 
 on:
   workflow_dispatch:
@@ -99,7 +99,7 @@ jobs:
     if: |
       needs.sync.outputs.changed == 'true' ||
       inputs.force_ci == true
-    runs-on: linux-aarch64-a2-8
+    runs-on: linux-aarch64-a2-2
     container:
       image: ascendai/cann:9.0.0-910b-ubuntu22.04-py3.11
       env:
