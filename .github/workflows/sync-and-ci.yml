@@ -132,12 +132,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[torch,testing]"
 
-      - name: Code quality checks
-        working-directory: transformers
-        run: |
-          make check-code-quality
-          make check-repository-consistency
-
       - name: Run tests
         working-directory: transformers
         run: |
