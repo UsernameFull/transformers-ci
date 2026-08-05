@@ -1,4 +1,4 @@
-﻿name: Transformers Sync and CI
+name: Transformers Sync and CI
 
 on:
   workflow_dispatch:
@@ -9,7 +9,7 @@ on:
         default: false
         type: boolean
       python_version_override:
-        description: Override the Python version (default: Python 3.11 from the CI image)
+        description: "Override the Python version (default: Python 3.12)"
         required: false
         type: string
 
