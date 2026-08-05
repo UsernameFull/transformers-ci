@@ -127,6 +127,11 @@ jobs:
           cache: pip
           cache-dependency-path: transformers/setup.py
 
+      - name: Install system dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ffmpeg
+
       - name: Install dependencies
         working-directory: transformers
         run: |
