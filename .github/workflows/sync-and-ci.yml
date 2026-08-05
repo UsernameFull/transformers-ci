@@ -111,7 +111,7 @@ jobs:
             test_path: tests/models tests/quantization
             timeout: 600
     container:
-      image: ghcr.io/${{ github.repository }}/transformers-ci-cann:latest
+      image: ascendai/cann:9.0.0-910b-ubuntu22.04-py3.11
       env:
         UV_NO_SYNC: 1
     permissions:
@@ -119,7 +119,7 @@ jobs:
     env:
       HF_ENDPOINT: ${{ vars.HF_ENDPOINT || 'https://huggingface.co' }}
       HF_HOME: /root/.cache/huggingface
-      PY: ${{ inputs.python_version_override != '' && 'python' || 'python3' }}
+      PYTHON_VERSION: ${{ inputs.python_version_override || '3.12' }}
     steps:
       - name: Checkout upstream commit
         uses: actions/checkout@v7
@@ -129,19 +129,25 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Set up Python (override)
-        if: inputs.python_version_override != ''
+      - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: ${{ inputs.python_version_override }}
-          cache: pip
-          cache-dependency-path: transformers/setup.py
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install system dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ffmpeg
 
       - name: Compute cache keys
         id: cache-key
         run: |
           echo "hf_cache=hf-cache-$(date +%Y-W%W)" >> "${GITHUB_OUTPUT}"
           echo "pip_cache=pip-cache-$(date +%Y-W%W)" >> "${GITHUB_OUTPUT}"
+
+      - name: Locate pip cache directory
+        id: pip-dir
+        run: echo "path=$(python -m pip cache dir)" >> "${GITHUB_OUTPUT}"
 
       - name: Restore Hugging Face cache
         uses: actions/cache@v4
@@ -153,20 +159,21 @@ jobs:
       - name: Restore pip cache
         uses: actions/cache@v4
         with:
-          path: /root/.cache/pip
+          path: ${{ steps.pip-dir.outputs.path }}
           key: ${{ steps.cache-key.outputs.pip_cache }}
           restore-keys: pip-cache-
 
-      - name: Install transformers (editable)
+      - name: Install dependencies
         working-directory: transformers
         run: |
-          ${PY} -m pip install --upgrade pip
-          ${PY} -m pip install -e ".[torch,testing,vision]"
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[torch,testing,vision]"
+          python -m pip install librosa torchcodec
 
       - name: Run tests
         working-directory: transformers
         run: |
-          ${PY} -m pytest \
+          python -m pytest \
             -p random_order \
             -n 2 \
             --dist=loadfile \

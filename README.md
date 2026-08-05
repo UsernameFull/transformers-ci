@@ -15,9 +15,8 @@ transformers-main   完整镜像 huggingface/transformers:main（完整历史，
 | --- | --- | --- |
 | `sync-and-ci.yml` | 每天 03:17 Asia/Tokyo；`workflow_dispatch` | 同步上游 `main` 到 `transformers-main`；镜像 SHA 变化时并行运行 3 组 CI（common / trainer / models），无变化时跳过 CI |
 | `keepalive.yml` | 每天 03:37 Asia/Tokyo；`workflow_dispatch` | 距上次 Keepalive 提交满 15 天后更新 `.github/keepalive` 并提交，否则跳过 |
-| `build-ci-image.yml` | 每周一 03:07 Asia/Tokyo；`workflow_dispatch` | 构建并推送 CI 镜像 `ghcr.io/<owner>/<repo>/transformers-ci-cann:latest` |
 
-CI 三个并行 job（均使用 `linux-aarch64-a2-2` runner + 预构建 CANN 镜像）：
+CI 三个并行 job（均使用 `linux-aarch64-a2-2` runner + CANN 容器镜像）：
 
 | job | 覆盖范围 |
 | --- | --- |
@@ -25,7 +24,7 @@ CI 三个并行 job（均使用 `linux-aarch64-a2-2` runner + 预构建 CANN 镜
 | `trainer` | `tests/trainer tests/optimization` |
 | `models` | `tests/models tests/quantization` |
 
-预构建镜像预装了 ffmpeg、torch/torchvision/torchaudio、librosa、torchcodec 及 `[torch,testing,vision]` 全量依赖，每次运行只需 `pip install -e .` 安装 transformers 本体；HF 模型缓存（`/root/.cache/huggingface`）与 pip 缓存按周滚动缓存，避免重复下载。
+缓存策略（按周滚动，避免每次重复下载）：HF 模型缓存（`/root/.cache/huggingface`）与 pip 下载缓存，均通过 `actions/cache` 恢复。
 
 两个工作流使用独立的 concurrency group，互不取消。
 
@@ -45,7 +44,7 @@ CI 三个并行 job（均使用 `linux-aarch64-a2-2` runner + 预构建 CANN 镜
 | `MIRROR_BRANCH` | `transformers-main` |
 | `HF_ENDPOINT` | `https://huggingface.co`（自托管 runner 若在受限网络，可设为 `https://hf-mirror.com`） |
 
-Python 版本由 CI 镜像提供（CANN 基础镜像自带 Python 3.11），CI 不再下载独立 Python；如需其他版本，用 `workflow_dispatch` 的 `python_version_override` 输入。
+安装依赖为 `.[torch,testing,vision]` + `librosa` + `torchcodec`（vision extra 提供 torchvision；`[audio]` extra 因 kenlm 无 aarch64 wheel 不能用于 ARM64 runner；datasets 5.x 的 Audio feature 用 torchcodec 解码，transformers 的 load_audio 用 librosa 回退）。
 
 > 已知环境特有失败：`test_qkv_chunk_rope_permute_with_fp8_quantization` 在 ARM64 CPU runner 上（triton 3.x 可用但 CPU 后端行为异常）会失败——上游测试假定 triton 在 GPU 上运行，属环境差异，非工作流问题。
 
