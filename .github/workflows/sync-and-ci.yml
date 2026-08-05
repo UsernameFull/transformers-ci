@@ -139,30 +139,6 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends ffmpeg
 
-      - name: Compute cache keys
-        id: cache-key
-        run: |
-          echo "hf_cache=hf-cache-$(date +%Y-W%W)" >> "${GITHUB_OUTPUT}"
-          echo "pip_cache=pip-cache-$(date +%Y-W%W)" >> "${GITHUB_OUTPUT}"
-
-      - name: Locate pip cache directory
-        id: pip-dir
-        run: echo "path=$(python -m pip cache dir)" >> "${GITHUB_OUTPUT}"
-
-      - name: Restore Hugging Face cache
-        uses: actions/cache@v4
-        with:
-          path: /root/.cache/huggingface
-          key: ${{ steps.cache-key.outputs.hf_cache }}
-          restore-keys: hf-cache-
-
-      - name: Restore pip cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pip-dir.outputs.path }}
-          key: ${{ steps.cache-key.outputs.pip_cache }}
-          restore-keys: pip-cache-
-
       - name: Install dependencies
         working-directory: transformers
         run: |
@@ -179,6 +155,85 @@ jobs:
             --dist=loadfile \
             --random-order-bucket=module \
             -rA \
+            --junitxml=reports/junit_${{ matrix.name }}.xml \
             ${CI_TEST_PATH}
         env:
           CI_TEST_PATH: ${{ matrix.test_path }}
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ matrix.name }}
+          path: transformers/reports/
+          if-no-files-found: warn
+
+  report:
+    name: Test Report
+    needs: ci
+    if: always() && needs.ci.result != 'skipped'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download test reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-reports-*
+          path: reports
+          merge-multiple: true
+
+      - name: Generate summary
+        run: |
+          python3 - <<'EOF'
+          import glob
+          import os
+          import xml.etree.ElementTree as ET
+
+          files = sorted(glob.glob("reports/*.xml"))
+          lines = ["## Transformers CI Test Report", ""]
+          if not files:
+              lines.append("No test reports were uploaded.")
+          else:
+              lines.append("| Job | Tests | Passed | Failed | Errors | Skipped |")
+              lines.append("|---|---|---|---|---|---|")
+              totals = {"tests": 0, "passed": 0, "failed": 0, "errors": 0, "skipped": 0}
+              failures = []
+              for f in files:
+                  root = ET.parse(f).getroot()
+                  job = os.path.basename(f).replace("junit_", "").replace(".xml", "")
+                  tests = failed = errors = skipped = 0
+                  for suite in root.iter("testsuite"):
+                      tests += int(suite.get("tests", 0))
+                      failed += int(suite.get("failures", 0))
+                      errors += int(suite.get("errors", 0))
+                      skipped += int(suite.get("skipped", 0))
+                      for case in suite.iter("testcase"):
+                          for child in case:
+                              if child.tag in ("failure", "error"):
+                                  msg = (child.get("message") or "").splitlines()[0] if child.get("message") else ""
+                                  failures.append((job, case.get("classname"), case.get("name"), msg[:150]))
+                  passed = tests - failed - errors - skipped
+                  totals["tests"] += tests
+                  totals["failed"] += failed
+                  totals["errors"] += errors
+                  totals["skipped"] += skipped
+                  totals["passed"] += passed
+                  lines.append(f"| {job} | {tests} | {passed} | {failed} | {errors} | {skipped} |")
+              lines.append(
+                  f"| **Total** | **{totals['tests']}** | **{totals['passed']}** | **{totals['failed']}** "
+                  f"| **{totals['errors']}** | **{totals['skipped']}** |"
+              )
+              lines.append("")
+              if failures:
+                  lines.append(f"### Failed tests ({len(failures)})")
+                  lines.append("")
+                  for job, cls, name, msg in failures[:100]:
+                      lines.append(f"- `{cls}::{name}` ({job}) - {msg}")
+                  if len(failures) > 100:
+                      lines.append(f"- ... and {len(failures) - 100} more")
+              else:
+                  lines.append("All tests passed.")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as out:
+              out.write("\n".join(lines) + "\n")
+          EOF

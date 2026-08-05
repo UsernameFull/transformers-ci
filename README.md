@@ -24,7 +24,9 @@ CI 三个并行 job（均使用 `linux-aarch64-a2-2` runner + CANN 容器镜像�
 | `trainer` | `tests/trainer tests/optimization` |
 | `models` | `tests/models tests/quantization` |
 
-缓存策略（按周滚动，避免每次重复下载）：HF 模型缓存（`/root/.cache/huggingface`）与 pip 下载缓存，均通过 `actions/cache` 恢复。
+缓存策略：runner 的 `/root/.cache` 目录为持久缓存目录（runner 主机保留），pip 下载缓存（`/root/.cache/pip`）与 HF 模型缓存（`HF_HOME=/root/.cache/huggingface`）跨 run 自动保留，无需 actions/cache 上传下载。
+
+CI 完成后 `report` job（GitHub 托管 runner）汇总 3 个 job 的 pytest junit 报告，输出到 run 的 Job Summary（测试总数/通过/失败/跳过及失败用例列表）。
 
 两个工作流使用独立的 concurrency group，互不取消。
 
