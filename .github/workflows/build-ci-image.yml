@@ -19,21 +19,23 @@ jobs:
   build:
     name: Build and push CANN CI image
     runs-on: linux-aarch64-a2-2
+    container:
+      image: kaniko-project/executor:latest
+      options: --user root
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ci.Dockerfile
-          push: true
-          tags: ghcr.io/${{ github.repository }}/transformers-ci-cann:latest
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p /kaniko/.docker
+          AUTH=$(printf '%s:%s' 'github' "${GHCR_TOKEN}" | base64 -w 0)
+          printf '{"auths":{"ghcr.io":{"auth":"%s"}}}' "${AUTH}" > /kaniko/.docker/config.json
+          /kaniko/executor \
+            --context dir:///github/workspace \
+            --dockerfile ci.Dockerfile \
+            --destination ghcr.io/${GITHUB_REPOSITORY}/transformers-ci-cann:latest \
+            --cache=false \
+            --no-push-cache
