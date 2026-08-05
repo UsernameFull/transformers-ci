@@ -8,12 +8,8 @@ on:
         required: false
         default: false
         type: boolean
-      test_path_override:
-        description: Override the CI test path
-        required: false
-        type: string
       python_version_override:
-        description: Override the Python version
+        description: Override the Python version (default: Python 3.11 from the CI image)
         required: false
         type: string
 
@@ -94,23 +90,36 @@ jobs:
           rm -f "${SSH_KEY_FILE}"
 
   ci:
-    name: CI on latest upstream commit
+    name: CI (${{ matrix.name }})
     needs: sync
     if: |
       needs.sync.outputs.changed == 'true' ||
       inputs.force_ci == true
     runs-on: linux-aarch64-a2-2
+    timeout-minutes: ${{ matrix.timeout }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: common
+            test_path: tests/utils tests/generation tests/pipelines tests/tokenization tests/cli tests/repo_utils
+            timeout: 240
+          - name: trainer
+            test_path: tests/trainer tests/optimization
+            timeout: 240
+          - name: models
+            test_path: tests/models tests/quantization
+            timeout: 600
     container:
-      image: ascendai/cann:9.0.0-910b-ubuntu22.04-py3.11
+      image: ghcr.io/${{ github.repository }}/transformers-ci-cann:latest
       env:
-        HF_ENDPOINT: https://hf-mirror.com
         UV_NO_SYNC: 1
     permissions:
       contents: read
     env:
-      PYTHON_VERSION: ${{ inputs.python_version_override || vars.PYTHON_VERSION || '3.12' }}
-      CI_TEST_PATH: ${{ inputs.test_path_override || vars.CI_TEST_PATH || 'tests/utils' }}
       HF_ENDPOINT: ${{ vars.HF_ENDPOINT || 'https://huggingface.co' }}
+      HF_HOME: /root/.cache/huggingface
+      PY: ${{ inputs.python_version_override != '' && 'python' || 'python3' }}
     steps:
       - name: Checkout upstream commit
         uses: actions/checkout@v7
@@ -120,32 +129,49 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Set up Python
+      - name: Set up Python (override)
+        if: inputs.python_version_override != ''
         uses: actions/setup-python@v7
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ inputs.python_version_override }}
           cache: pip
           cache-dependency-path: transformers/setup.py
 
-      - name: Install system dependencies
+      - name: Compute cache keys
+        id: cache-key
         run: |
-          apt-get update
-          apt-get install -y --no-install-recommends ffmpeg
+          echo "hf_cache=hf-cache-$(date +%Y-W%W)" >> "${GITHUB_OUTPUT}"
+          echo "pip_cache=pip-cache-$(date +%Y-W%W)" >> "${GITHUB_OUTPUT}"
 
-      - name: Install dependencies
+      - name: Restore Hugging Face cache
+        uses: actions/cache@v4
+        with:
+          path: /root/.cache/huggingface
+          key: ${{ steps.cache-key.outputs.hf_cache }}
+          restore-keys: hf-cache-
+
+      - name: Restore pip cache
+        uses: actions/cache@v4
+        with:
+          path: /root/.cache/pip
+          key: ${{ steps.cache-key.outputs.pip_cache }}
+          restore-keys: pip-cache-
+
+      - name: Install transformers (editable)
         working-directory: transformers
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e ".[torch,testing,vision]"
-          python -m pip install librosa torchcodec
+          ${PY} -m pip install --upgrade pip
+          ${PY} -m pip install -e ".[torch,testing,vision]"
 
       - name: Run tests
         working-directory: transformers
         run: |
-          python -m pytest \
+          ${PY} -m pytest \
             -p random_order \
             -n 2 \
             --dist=loadfile \
             --random-order-bucket=module \
             -rA \
-            "${CI_TEST_PATH}"
+            ${CI_TEST_PATH}
+        env:
+          CI_TEST_PATH: ${{ matrix.test_path }}
