@@ -3,11 +3,6 @@ name: Transformers Sync and CI
 on:
   workflow_dispatch:
     inputs:
-      force_ci:
-        description: Run CI even if upstream is unchanged
-        required: false
-        default: false
-        type: boolean
       python_version_override:
         description: "Override the Python version (default: Python 3.12)"
         required: false
@@ -92,9 +87,6 @@ jobs:
   ci:
     name: CI (${{ matrix.name }})
     needs: sync
-    if: |
-      needs.sync.outputs.changed == 'true' ||
-      inputs.force_ci == true
     runs-on: linux-aarch64-a2-2
     timeout-minutes: ${{ matrix.timeout }}
     strategy:
@@ -117,7 +109,7 @@ jobs:
     permissions:
       contents: read
     env:
-      HF_ENDPOINT: ${{ vars.HF_ENDPOINT || 'https://huggingface.co' }}
+      HF_ENDPOINT: ${{ vars.HF_ENDPOINT || 'https://hf-mirror.com' }}
       HF_HOME: /root/.cache/huggingface
       PYTHON_VERSION: ${{ inputs.python_version_override || '3.12' }}
     steps:
@@ -175,6 +167,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      checks: write
     steps:
       - name: Download test reports
         uses: actions/download-artifact@v4
@@ -183,57 +176,11 @@ jobs:
           path: reports
           merge-multiple: true
 
-      - name: Generate summary
-        run: |
-          python3 - <<'EOF'
-          import glob
-          import os
-          import xml.etree.ElementTree as ET
-
-          files = sorted(glob.glob("reports/*.xml"))
-          lines = ["## Transformers CI Test Report", ""]
-          if not files:
-              lines.append("No test reports were uploaded.")
-          else:
-              lines.append("| Job | Tests | Passed | Failed | Errors | Skipped |")
-              lines.append("|---|---|---|---|---|---|")
-              totals = {"tests": 0, "passed": 0, "failed": 0, "errors": 0, "skipped": 0}
-              failures = []
-              for f in files:
-                  root = ET.parse(f).getroot()
-                  job = os.path.basename(f).replace("junit_", "").replace(".xml", "")
-                  tests = failed = errors = skipped = 0
-                  for suite in root.iter("testsuite"):
-                      tests += int(suite.get("tests", 0))
-                      failed += int(suite.get("failures", 0))
-                      errors += int(suite.get("errors", 0))
-                      skipped += int(suite.get("skipped", 0))
-                      for case in suite.iter("testcase"):
-                          for child in case:
-                              if child.tag in ("failure", "error"):
-                                  msg = (child.get("message") or "").splitlines()[0] if child.get("message") else ""
-                                  failures.append((job, case.get("classname"), case.get("name"), msg[:150]))
-                  passed = tests - failed - errors - skipped
-                  totals["tests"] += tests
-                  totals["failed"] += failed
-                  totals["errors"] += errors
-                  totals["skipped"] += skipped
-                  totals["passed"] += passed
-                  lines.append(f"| {job} | {tests} | {passed} | {failed} | {errors} | {skipped} |")
-              lines.append(
-                  f"| **Total** | **{totals['tests']}** | **{totals['passed']}** | **{totals['failed']}** "
-                  f"| **{totals['errors']}** | **{totals['skipped']}** |"
-              )
-              lines.append("")
-              if failures:
-                  lines.append(f"### Failed tests ({len(failures)})")
-                  lines.append("")
-                  for job, cls, name, msg in failures[:100]:
-                      lines.append(f"- `{cls}::{name}` ({job}) - {msg}")
-                  if len(failures) > 100:
-                      lines.append(f"- ... and {len(failures) - 100} more")
-              else:
-                  lines.append("All tests passed.")
-          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as out:
-              out.write("\n".join(lines) + "\n")
-          EOF
+      - name: Publish test results
+        uses: dorny/test-reporter@v1
+        if: success() || failure()
+        with:
+          name: Transformers Test Results
+          path: reports/**/*.xml
+          reporter: java-junit
+          fail-on-error: false
