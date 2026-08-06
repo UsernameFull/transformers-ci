@@ -100,7 +100,7 @@ jobs:
             test_path: tests/trainer tests/optimization
             timeout: 240
           - name: models
-            test_path: tests/models/colqwen2 tests/models/qwen2 tests/models/qwen2_5_omni tests/models/qwen2_5_vl tests/models/qwen2_moe tests/models/qwen2_vl tests/models/qwen3 tests/models/qwen3_5 tests/models/qwen3_5_moe tests/models/qwen3_moe tests/models/qwen3_next tests/models/qwen3_omni_moe tests/models/qwen3_vl tests/models/qwen3_vl_moe
+            test_path: tests/models/qwen3 tests/models/qwen3_5 tests/models/qwen3_5_moe tests/models/qwen3_moe tests/models/qwen3_next
             timeout: 240
     container:
       image: ascendai/cann:9.0.0-910b-ubuntu22.04-py3.11
@@ -160,10 +160,97 @@ jobs:
           path: transformers/reports/
           if-no-files-found: warn
 
+  extra:
+    name: Extra CI (${{ matrix.name }})
+    needs: sync
+    runs-on: linux-aarch64-a2-2
+    timeout-minutes: ${{ matrix.timeout }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: exporters
+            test_path: tests/exporters
+            extra_pip: onnx onnxruntime
+            timeout: 180
+          - name: integrations
+            test_path: tests/integrations tests/kernels tests/heterogeneity tests/tensor_parallel
+            extra_pip: kernels optuna codecarbon
+            timeout: 180
+          - name: peft
+            test_path: tests/peft_integration
+            extra_pip: peft
+            timeout: 180
+          - name: sagemaker
+            test_path: tests/sagemaker
+            extra_pip: sagemaker
+            timeout: 180
+    container:
+      image: ascendai/cann:9.0.0-910b-ubuntu22.04-py3.11
+      env:
+        UV_NO_SYNC: 1
+    permissions:
+      contents: read
+    env:
+      HF_ENDPOINT: ${{ vars.HF_ENDPOINT || 'https://hf-mirror.com' }}
+      HF_HOME: /root/.cache/huggingface
+    steps:
+      - name: Checkout upstream commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.sync.outputs.upstream_sha }}
+          path: transformers
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install system dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Install dependencies
+        working-directory: transformers
+        env:
+          EXTRA_PIP: ${{ matrix.extra_pip }}
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[torch,testing,vision]"
+          python -m pip install librosa torchcodec ${EXTRA_PIP}
+
+      - name: Run tests
+        working-directory: transformers
+        run: |
+          python -m pytest \
+            -p random_order \
+            -n 2 \
+            --dist=loadfile \
+            --random-order-bucket=module \
+            -rA \
+            --junitxml=reports/junit_${{ matrix.name }}.xml \
+            ${CI_TEST_PATH}
+        env:
+          CI_TEST_PATH: ${{ matrix.test_path }}
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-extra-${{ matrix.name }}
+          path: transformers/reports/
+          if-no-files-found: warn
+
   report:
     name: Test Report
-    needs: ci
-    if: always() && (needs.ci.result == 'success' || needs.ci.result == 'failure')
+    needs: [ci, extra]
+    if: |
+      always() &&
+      (needs.ci.result == 'success' || needs.ci.result == 'failure' ||
+       needs.extra.result == 'success' || needs.extra.result == 'failure')
     runs-on: ubuntu-latest
     permissions:
       contents: read

@@ -16,13 +16,17 @@ transformers-main   完整镜像 huggingface/transformers:main（完整历史，
 | `sync-and-ci.yml` | 每天 03:17 Asia/Tokyo；`workflow_dispatch` | 同步上游 `main` 到 `transformers-main`（无变化时不推送）；每次运行均并行执行 3 组 CI（common / trainer / models） |
 | `keepalive.yml` | 每天 03:37 Asia/Tokyo；`workflow_dispatch` | 距上次 Keepalive 提交满 15 天后更新 `.github/keepalive` 并提交，否则跳过 |
 
-CI 三个并行 job（均使用 `linux-aarch64-a2-2` runner + CANN 容器镜像）：
+CI 并行 job（均使用 `linux-aarch64-a2-2` runner + CANN 容器镜像）：
 
 | job | 覆盖范围 |
 | --- | --- |
 | `common` | `tests/utils tests/generation tests/pipelines tests/tokenization tests/cli tests/repo_utils` |
 | `trainer` | `tests/trainer tests/optimization` |
-| `models` | qwen 系列（排除 `qwen2_audio`/`qwen3_asr`——依赖 torchaudio 未装且 `qwen3_asr` 会触发 pytest 8.4.2 traceback 格式化崩溃） |
+| `models` | qwen3 文本模型：`tests/models/qwen3 qwen3_5 qwen3_5_moe qwen3_moe qwen3_next`（排除 VL/omni 多模态与 `qwen3_asr`——依赖缺失且 `qwen3_asr` 触发 pytest 8.4.2 traceback 格式化崩溃） |
+| `extra/exporters` | `tests/exporters`（onnx, onnxruntime） |
+| `extra/integrations` | `tests/integrations tests/kernels tests/heterogeneity tests/tensor_parallel`（kernels, optuna, codecarbon） |
+| `extra/peft` | `tests/peft_integration`（peft） |
+| `extra/sagemaker` | `tests/sagemaker`（sagemaker） |
 
 缓存策略：runner 的 `/root/.cache` 目录为持久缓存目录（runner 主机保留），pip 下载缓存（`/root/.cache/pip`）与 HF 模型缓存（`HF_HOME=/root/.cache/huggingface`）跨 run 自动保留，无需 actions/cache 上传下载。
 
