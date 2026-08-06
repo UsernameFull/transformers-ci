@@ -163,7 +163,7 @@ jobs:
   report:
     name: Test Report
     needs: ci
-    if: always() && needs.ci.result != 'skipped'
+    if: always() && (needs.ci.result == 'success' || needs.ci.result == 'failure')
     runs-on: ubuntu-latest
     permissions:
       contents: read
