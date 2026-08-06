@@ -22,7 +22,7 @@ CI 三个并行 job（均使用 `linux-aarch64-a2-2` runner + CANN 容器镜像�
 | --- | --- |
 | `common` | `tests/utils tests/generation tests/pipelines tests/tokenization tests/cli tests/repo_utils` |
 | `trainer` | `tests/trainer tests/optimization` |
-| `models` | qwen 系列：`tests/models/qwen2* tests/models/qwen3* tests/models/colqwen2`（后续可按 transformers 的切片方案扩展全量） |
+| `models` | qwen 系列（排除 `qwen2_audio`/`qwen3_asr`——依赖 torchaudio 未装且 `qwen3_asr` 会触发 pytest 8.4.2 traceback 格式化崩溃） |
 
 缓存策略：runner 的 `/root/.cache` 目录为持久缓存目录（runner 主机保留），pip 下载缓存（`/root/.cache/pip`）与 HF 模型缓存（`HF_HOME=/root/.cache/huggingface`）跨 run 自动保留，无需 actions/cache 上传下载。
 

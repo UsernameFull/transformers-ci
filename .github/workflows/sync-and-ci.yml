@@ -100,7 +100,7 @@ jobs:
             test_path: tests/trainer tests/optimization
             timeout: 240
           - name: models
-            test_path: tests/models/colqwen2 tests/models/qwen2 tests/models/qwen2_5_omni tests/models/qwen2_5_vl tests/models/qwen2_audio tests/models/qwen2_moe tests/models/qwen2_vl tests/models/qwen3 tests/models/qwen3_5 tests/models/qwen3_5_moe tests/models/qwen3_asr tests/models/qwen3_moe tests/models/qwen3_next tests/models/qwen3_omni_moe tests/models/qwen3_vl tests/models/qwen3_vl_moe
+            test_path: tests/models/colqwen2 tests/models/qwen2 tests/models/qwen2_5_omni tests/models/qwen2_5_vl tests/models/qwen2_moe tests/models/qwen2_vl tests/models/qwen3 tests/models/qwen3_5 tests/models/qwen3_5_moe tests/models/qwen3_moe tests/models/qwen3_next tests/models/qwen3_omni_moe tests/models/qwen3_vl tests/models/qwen3_vl_moe
             timeout: 240
     container:
       image: ascendai/cann:9.0.0-910b-ubuntu22.04-py3.11
