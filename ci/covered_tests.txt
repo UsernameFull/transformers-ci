@@ -34,3 +34,22 @@ tests/models/qwen3
 !tests/conftest_tests
 !tests/fixtures
 !tests/quantization
+
+# 有意排除（全模型参数化 mixin/common：直接跑几乎无用例，实际随模型继承执行）
+!tests/test_backbone_common.py
+!tests/test_configuration_common.py
+!tests/test_executorch.py
+!tests/test_feature_extraction_common.py
+!tests/test_fsdp_mixin.py
+!tests/test_image_processing_common.py
+!tests/test_modeling_common.py
+!tests/test_pipeline_mixin.py
+!tests/test_processing_common.py
+!tests/test_sentencepiece_backend_mixin.py
+!tests/test_sequence_feature_extraction_common.py
+!tests/test_tensor_parallel_mixin.py
+!tests/test_tokenization_common.py
+!tests/test_tokenization_mistral_common.py
+!tests/test_tokenizers_backend_mixin.py
+!tests/test_training_mixin.py
+!tests/test_video_processing_common.py
