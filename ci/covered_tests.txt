@@ -1,0 +1,36 @@
+# Transformers CI 测试覆盖清单
+# 规则：
+#   普通行  = 已覆盖的测试路径（顶层目录自动覆盖目录内新增文件）
+#   ! 前缀  = 有意排除，不告警
+#   # 注释
+#
+# 上游新增的顶层目录或测试文件若不在清单中，coverage job 会失败，需人工决定是否纳入。
+
+# 顶层测试目录（common / trainer / extra 已覆盖）
+tests/utils
+tests/generation
+tests/pipelines
+tests/tokenization
+tests/cli
+tests/repo_utils
+tests/trainer
+tests/optimization
+tests/exporters
+tests/integrations
+tests/kernels
+tests/heterogeneity
+tests/tensor_parallel
+tests/peft_integration
+tests/sagemaker
+
+# 顶层测试文件
+tests/test_image_transforms.py
+tests/test_monkey_patching.py
+
+# 模型目录（当前只测 qwen3；其他模型目录不告警）
+tests/models/qwen3
+
+# 有意排除（辅助目录 / 已决定不测）
+!tests/conftest_tests
+!tests/fixtures
+!tests/quantization

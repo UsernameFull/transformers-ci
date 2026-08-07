@@ -94,7 +94,7 @@ jobs:
       matrix:
         include:
           - name: common
-            test_path: tests/utils tests/generation tests/pipelines tests/tokenization tests/cli tests/repo_utils
+            test_path: tests/utils tests/generation tests/pipelines tests/tokenization tests/cli tests/repo_utils tests/test_image_transforms.py tests/test_monkey_patching.py
             timeout: 240
           - name: trainer
             test_path: tests/trainer tests/optimization
@@ -165,6 +165,29 @@ jobs:
           name: test-reports-${{ matrix.name }}
           path: transformers/reports/
           if-no-files-found: warn
+
+  coverage:
+    name: Coverage Watch
+    needs: sync
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Checkout upstream tests
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.MIRROR_BRANCH }}
+          path: transformers
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Check coverage
+        run: python3 ci/check_coverage.py
+        env:
+          TEST_DIR: transformers/tests
 
   report:
     name: Test Report

@@ -27,7 +27,9 @@ CI 并行 job（均使用 `linux-aarch64-a2-2` runner + CANN 容器镜像）：
 
 缓存策略：runner 的 `/root/.cache` 目录为持久缓存目录（runner 主机保留），pip 下载缓存（`/root/.cache/pip`）与 HF 模型缓存（`HF_HOME=/root/.cache/huggingface`）跨 run 自动保留，无需 actions/cache 上传下载。
 
-CI 完成后 `report` job（GitHub 托管 runner）用 `dorny/test-reporter` 汇总 3 个 job 的 pytest junit 报告，发布为 commit 上的 **Transformers Test Results** check（总数/失败/跳过摘要 + 失败用例 annotation）。
+CI 完成后 `report` job（GitHub 托管 runner）用 `dorny/test-reporter` 汇总各 job 的 pytest junit 报告，发布为 commit 上的 **Transformers Test Results** check（汇总 + 失败用例明细，`use-actions-summary: false` 不使用 job summary）。
+
+`coverage` job（Coverage Watch）看护测试覆盖：对照 `ci/covered_tests.txt` 清单扫描上游 `tests/`，上游新增顶层测试目录/文件未纳入清单时该 job 失败（强制人工确认），清单中路径消失也失败；`tests/models` 新增模型目录仅信息展示（模型按需选择）。
 
 两个工作流使用独立的 concurrency group，互不取消。
 
