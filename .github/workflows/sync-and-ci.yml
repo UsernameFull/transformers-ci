@@ -9,8 +9,8 @@ on:
         type: string
 
   schedule:
-    - cron: "17 3 * * *"
-      timezone: "Asia/Tokyo"
+    - cron: "0 3 * * *"
+      timezone: "Asia/Shanghai"
 
 concurrency:
   group: transformers-sync-ci
@@ -194,3 +194,4 @@ jobs:
           reporter: java-junit
           fail-on-error: false
           list-tests: "failed"
+          use-actions-summary: false
