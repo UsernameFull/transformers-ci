@@ -22,11 +22,8 @@ CI 并行 job（均使用 `linux-aarch64-a2-2` runner + CANN 容器镜像）：
 | --- | --- |
 | `common` | `tests/utils tests/generation tests/pipelines tests/tokenization tests/cli tests/repo_utils` |
 | `trainer` | `tests/trainer tests/optimization` |
-| `models` | qwen3 文本模型：`tests/models/qwen3 qwen3_5 qwen3_5_moe qwen3_moe qwen3_next`（排除 VL/omni 多模态与 `qwen3_asr`——依赖缺失且 `qwen3_asr` 触发 pytest 8.4.2 traceback 格式化崩溃） |
-| `extra/exporters` | `tests/exporters`（onnx, onnxruntime） |
-| `extra/integrations` | `tests/integrations tests/kernels tests/heterogeneity tests/tensor_parallel`（kernels, optuna, codecarbon） |
-| `extra/peft` | `tests/peft_integration`（peft） |
-| `extra/sagemaker` | `tests/sagemaker`（sagemaker） |
+| `models` | `tests/models/qwen3`（单目录；qwen3 的 generation/trainer 类测试在 2 核 CPU 上极慢，多目录会超时） |
+| `extra` | `tests/exporters tests/integrations tests/kernels tests/heterogeneity tests/tensor_parallel tests/peft_integration tests/sagemaker`（onnx, onnxruntime, kernels, optuna, codecarbon, peft, sagemaker） |
 
 缓存策略：runner 的 `/root/.cache` 目录为持久缓存目录（runner 主机保留），pip 下载缓存（`/root/.cache/pip`）与 HF 模型缓存（`HF_HOME=/root/.cache/huggingface`）跨 run 自动保留，无需 actions/cache 上传下载。
 
