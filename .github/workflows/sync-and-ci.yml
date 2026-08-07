@@ -217,4 +217,49 @@ jobs:
           reporter: java-junit
           fail-on-error: false
           list-tests: "failed"
-          use-actions-summary: false
+          use-actions-summary: true
+
+  run-status:
+    name: Run Status
+    needs: [sync, ci, coverage]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Write run status summary
+        env:
+          SYNC_RESULT: ${{ needs.sync.result }}
+          CI_RESULTS: ${{ toJson(needs.ci.results) }}
+          COVERAGE_RESULT: ${{ needs.coverage.result }}
+        run: |
+          python3 - <<'EOF'
+          import json
+          import os
+
+          ICONS = {
+              "success": "✅",
+              "failure": "❌",
+              "cancelled": "⏹",
+              "skipped": "⏭",
+              "timed_out": "⏱",
+          }
+
+          def icon(result: str) -> str:
+              return ICONS.get(result or "", result or "?")
+
+          rows = [("sync", os.environ["SYNC_RESULT"])]
+          ci_results = json.loads(os.environ["CI_RESULTS"])
+          for job, result in sorted(ci_results.items()):
+              rows.append((job, result))
+          rows.append(("coverage", os.environ["COVERAGE_RESULT"]))
+
+          lines = ["## 运行情况", "", "| Job | 结果 |", "|---|---|"]
+          for job, result in rows:
+              lines.append(f"| {job} | {icon(result)} |")
+
+          summary = "\n".join(lines) + "\n"
+          print(summary)
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as out:
+              out.write(summary)
+          EOF
