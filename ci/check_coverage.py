@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Check that every top-level test directory/file added upstream is covered by our CI.
 
+Covered paths are DERIVED from the workflow's ci matrix test_path entries
+(single source of truth, no manual manifest to keep in sync). Exclusions live
+in ci/test_exclusions.txt.
+
 Usage:
     TEST_DIR=<path-to-transformers-tests> python3 ci/check_coverage.py
 
@@ -11,25 +15,42 @@ New tests/models/* directories are informational only (models are selected on pu
 import os
 import sys
 
+try:
+    import yaml
+except ImportError:
+    print("FAIL: pyyaml is required (pip install pyyaml)")
+    sys.exit(1)
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-MANIFEST = os.path.join(SCRIPT_DIR, "covered_tests.txt")
+EXCLUSIONS = os.path.join(SCRIPT_DIR, "test_exclusions.txt")
+WORKFLOW = os.environ.get(
+    "WORKFLOW_FILE",
+    os.path.normpath(os.path.join(SCRIPT_DIR, "..", ".github", "workflows", "sync-and-ci.yml")),
+)
 TEST_DIR = os.environ.get("TEST_DIR", "tests")
 PREFIX = "tests/"
 
 
-def load_manifest() -> tuple[set[str], set[str]]:
-    covered: set[str] = set()
+def load_exclusions() -> set[str]:
     excluded: set[str] = set()
-    with open(MANIFEST, encoding="utf-8") as f:
+    with open(EXCLUSIONS, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
-            if line.startswith("!"):
-                excluded.add(line[1:])
-            else:
-                covered.add(line)
-    return covered, excluded
+            excluded.add(line)
+    return excluded
+
+
+def load_covered_from_workflow() -> set[str]:
+    """Extract covered test paths from the ci matrix test_path entries."""
+    with open(WORKFLOW, encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+    covered: set[str] = set()
+    for entry in data["jobs"]["ci"]["strategy"]["matrix"]["include"]:
+        for item in entry.get("test_path", "").split():
+            covered.add(item)
+    return covered
 
 
 def to_rel(item: str) -> str:
@@ -37,7 +58,8 @@ def to_rel(item: str) -> str:
 
 
 def main() -> int:
-    covered, excluded = load_manifest()
+    covered = load_covered_from_workflow()
+    excluded = load_exclusions()
     covered_rel = {to_rel(c) for c in covered}
     excluded_rel = {to_rel(e) for e in excluded}
 
@@ -71,10 +93,10 @@ def main() -> int:
     if not new_uncovered and not missing_covered:
         lines.append(f"- 全部顶层测试项均已覆盖（tests/models 目录 {models_count} 个，当前覆盖 {models_covered} 个）")
     if new_uncovered:
-        lines.append(f"### 新增未覆盖（{len(new_uncovered)} 项，需加入 ci/covered_tests.txt 或显式排除）")
+        lines.append(f"### 新增未覆盖（{len(new_uncovered)} 项，需加入 workflow test_path 或 ci/test_exclusions.txt）")
         lines.extend(f"- `{item}`" for item in new_uncovered)
     if missing_covered:
-        lines.append(f"### 清单中已消失的路径（{len(missing_covered)} 项，上游可能删除/改名）")
+        lines.append(f"### workflow 中已消失的路径（{len(missing_covered)} 项，上游可能删除/改名）")
         lines.extend(f"- `{item}`" for item in missing_covered)
 
     summary = "\n".join(lines)

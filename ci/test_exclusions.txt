@@ -1,0 +1,28 @@
+# Transformers CI 测试覆盖排除清单（有意不测的项）
+# 已覆盖路径由 workflow 的 ci 矩阵 test_path 自动推导（单一事实来源），无需在此维护。
+# 规则：一行一个路径；# 为注释。
+# 上游新增的顶层目录或测试文件若既不在 test_path、也不在此清单中，coverage job 会失败。
+
+# 辅助目录 / 已决定不测
+tests/conftest_tests
+tests/fixtures
+tests/quantization
+
+# 全模型参数化 mixin/common（直接跑几乎无用例，实际随模型继承执行）
+tests/test_backbone_common.py
+tests/test_configuration_common.py
+tests/test_executorch.py
+tests/test_feature_extraction_common.py
+tests/test_fsdp_mixin.py
+tests/test_image_processing_common.py
+tests/test_modeling_common.py
+tests/test_pipeline_mixin.py
+tests/test_processing_common.py
+tests/test_sentencepiece_backend_mixin.py
+tests/test_sequence_feature_extraction_common.py
+tests/test_tensor_parallel_mixin.py
+tests/test_tokenization_common.py
+tests/test_tokenization_mistral_common.py
+tests/test_tokenizers_backend_mixin.py
+tests/test_training_mixin.py
+tests/test_video_processing_common.py

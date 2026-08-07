@@ -185,7 +185,9 @@ jobs:
           persist-credentials: false
 
       - name: Check coverage
-        run: python3 ci/check_coverage.py
+        run: |
+          python3 -m pip install --quiet --disable-pip-version-check pyyaml
+          python3 ci/check_coverage.py
         env:
           TEST_DIR: transformers/tests
 
