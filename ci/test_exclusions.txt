@@ -21,8 +21,5 @@ tests/test_processing_common.py
 tests/test_sentencepiece_backend_mixin.py
 tests/test_sequence_feature_extraction_common.py
 tests/test_tensor_parallel_mixin.py
-tests/test_tokenization_common.py
-tests/test_tokenization_mistral_common.py
-tests/test_tokenizers_backend_mixin.py
 tests/test_training_mixin.py
 tests/test_video_processing_common.py

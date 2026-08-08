@@ -47,7 +47,7 @@ CI 完成后 `report` job（GitHub 托管 runner）用 `dorny/test-reporter` 汇
 | `UPSTREAM_URL` | `https://github.com/huggingface/transformers.git` |
 | `UPSTREAM_BRANCH` | `main` |
 | `MIRROR_BRANCH` | `transformers-main` |
-| `HF_ENDPOINT` | `https://hf-mirror.com`（国内镜像；如需直连可设为 `https://huggingface.co`） |
+| `HF_ENDPOINT` | `https://huggingface.co`（如网络受限可设为 `https://hf-mirror.com`，但镜像对 HEAD 元数据检查不兼容会导致部分测试失败） |
 
 安装依赖为 `.[torch,testing,vision]` + `librosa` + `torchcodec`（vision extra 提供 torchvision；`[audio]` extra 因 kenlm 无 aarch64 wheel 不能用于 ARM64 runner；datasets 5.x 的 Audio feature 用 torchcodec 解码，transformers 的 load_audio 用 librosa 回退）。
 

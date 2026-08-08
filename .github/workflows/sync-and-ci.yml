@@ -94,7 +94,7 @@ jobs:
       matrix:
         include:
           - name: common
-            test_path: tests/utils tests/generation tests/pipelines tests/tokenization tests/cli tests/repo_utils tests/test_image_transforms.py tests/test_monkey_patching.py
+            test_path: tests/utils tests/generation tests/pipelines tests/tokenization tests/cli tests/repo_utils tests/test_image_transforms.py tests/test_monkey_patching.py tests/test_tokenization_common.py tests/test_tokenization_mistral_common.py tests/test_tokenizers_backend_mixin.py
             timeout: 240
           - name: trainer
             test_path: tests/trainer tests/optimization
@@ -113,7 +113,7 @@ jobs:
     permissions:
       contents: read
     env:
-      HF_ENDPOINT: ${{ vars.HF_ENDPOINT || 'https://hf-mirror.com' }}
+      HF_ENDPOINT: ${{ vars.HF_ENDPOINT || 'https://huggingface.co' }}
       HF_HOME: /root/.cache/huggingface
       PYTHON_VERSION: ${{ inputs.python_version_override || '3.12' }}
     steps:
@@ -220,48 +220,3 @@ jobs:
           fail-on-error: false
           list-tests: "failed"
           use-actions-summary: true
-
-  run-status:
-    name: Run Status
-    needs: [ci, coverage]
-    if: always()
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: read
-    steps:
-      - name: Write run status summary
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/jobs" --paginate \
-            --jq '.jobs[] | "\(.name)\t\(.conclusion // "in_progress")"' \
-            > "${RUNNER_TEMP}/jobs.txt"
-          python3 - <<'EOF'
-          import os
-
-          ICONS = {
-              "success": "✅",
-              "failure": "❌",
-              "cancelled": "⏹",
-              "skipped": "⏭",
-              "timed_out": "⏱",
-          }
-
-          rows = []
-          with open(os.path.join(os.environ["RUNNER_TEMP"], "jobs.txt"), encoding="utf-8") as f:
-              for line in f:
-                  name, result = line.rstrip("\n").split("\t")
-                  if name == "Run Status":
-                      continue
-                  rows.append((name, result))
-
-          lines = ["## 运行情况", "", "| Job | 结果 |", "|---|---|"]
-          for name, result in rows:
-              lines.append(f"| {name} | {ICONS.get(result, result)} |")
-
-          summary = "\n".join(lines) + "\n"
-          print(summary)
-          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as out:
-              out.write(summary)
-          EOF
