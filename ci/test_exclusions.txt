@@ -8,6 +8,12 @@ tests/conftest_tests
 tests/fixtures
 tests/quantization
 
+# 环境不支持（aarch64 runner 无 AWS SageMaker 环境，收集即失败；需 AWS 账号+付费资源）
+tests/sagemaker
+
+# 环境不支持（kernels-community 仅提供 x86_64 预编译 wheel，aarch64 无匹配变体）
+tests/kernels
+
 # 全模型参数化 mixin/common（直接跑几乎无用例，实际随模型继承执行）
 tests/test_backbone_common.py
 tests/test_configuration_common.py

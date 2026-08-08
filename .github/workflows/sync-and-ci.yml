@@ -103,8 +103,8 @@ jobs:
             test_path: tests/models/qwen3
             timeout: 240
           - name: extra
-            test_path: tests/exporters tests/integrations tests/kernels tests/heterogeneity tests/tensor_parallel tests/peft_integration tests/sagemaker
-            extra_pip: onnx onnxruntime kernels optuna codecarbon peft sagemaker
+            test_path: tests/exporters tests/integrations tests/heterogeneity tests/tensor_parallel tests/peft_integration
+            extra_pip: onnx onnxruntime peft
             timeout: 240
     container:
       image: ascendai/cann:9.0.0-910b-ubuntu22.04-py3.11
