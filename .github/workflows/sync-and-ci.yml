@@ -223,20 +223,21 @@ jobs:
 
   run-status:
     name: Run Status
-    needs: [sync, ci, coverage]
+    needs: [ci, coverage]
     if: always()
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read
     steps:
       - name: Write run status summary
         env:
-          SYNC_RESULT: ${{ needs.sync.result }}
-          CI_RESULTS: ${{ toJson(needs.ci.results) }}
-          COVERAGE_RESULT: ${{ needs.coverage.result }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/jobs" --paginate \
+            --jq '.jobs[] | "\(.name)\t\(.conclusion // "in_progress")"' \
+            > "${RUNNER_TEMP}/jobs.txt"
           python3 - <<'EOF'
-          import json
           import os
 
           ICONS = {
@@ -247,18 +248,17 @@ jobs:
               "timed_out": "⏱",
           }
 
-          def icon(result: str) -> str:
-              return ICONS.get(result or "", result or "?")
-
-          rows = [("sync", os.environ["SYNC_RESULT"])]
-          ci_results = json.loads(os.environ["CI_RESULTS"])
-          for job, result in sorted(ci_results.items()):
-              rows.append((job, result))
-          rows.append(("coverage", os.environ["COVERAGE_RESULT"]))
+          rows = []
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "jobs.txt"), encoding="utf-8") as f:
+              for line in f:
+                  name, result = line.rstrip("\n").split("\t")
+                  if name == "Run Status":
+                      continue
+                  rows.append((name, result))
 
           lines = ["## 运行情况", "", "| Job | 结果 |", "|---|---|"]
-          for job, result in rows:
-              lines.append(f"| {job} | {icon(result)} |")
+          for name, result in rows:
+              lines.append(f"| {name} | {ICONS.get(result, result)} |")
 
           summary = "\n".join(lines) + "\n"
           print(summary)
