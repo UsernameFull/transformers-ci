@@ -13,7 +13,7 @@ transformers-main   完整镜像 huggingface/transformers:main（完整历史，
 
 | 工作流 | 触发 | 行为 |
 | --- | --- | --- |
-| `sync-and-ci.yml` | 每天 03:17 Asia/Tokyo；`workflow_dispatch` | 同步上游 `main` 到 `transformers-main`（无变化时不推送）；每次运行均并行执行 3 组 CI（common / trainer / models） |
+| `sync-and-ci.yml` | 每天 03:00 Asia/Shanghai；`workflow_dispatch` | 同步上游 `main` 到 `transformers-main`（无变化时不推送）；每次运行均并行执行 4 组 CI（common / trainer / models / extra）。**每周日 03:00 为长测试日**（`RUN_SLOW=1` 解锁 @slow 用例，超时放宽到 600 分钟） |
 | `keepalive.yml` | 每天 03:37 Asia/Tokyo；`workflow_dispatch` | 距上次 Keepalive 提交满 15 天后更新 `.github/keepalive` 并提交，否则跳过 |
 
 CI 并行 job（均使用 `linux-aarch64-a2-2` runner + CANN 容器镜像）：
@@ -49,7 +49,7 @@ CI 完成后 `report` job（GitHub 托管 runner）用 `dorny/test-reporter` 汇
 | `MIRROR_BRANCH` | `transformers-main` |
 | `HF_ENDPOINT` | `https://huggingface.co`（如网络受限可设为 `https://hf-mirror.com`，但镜像对 HEAD 元数据检查不兼容会导致部分测试失败） |
 
-安装依赖为 `.[torch,testing,vision]` + `librosa` + `torchcodec`（vision extra 提供 torchvision；`[audio]` extra 因 kenlm 无 aarch64 wheel 不能用于 ARM64 runner；datasets 5.x 的 Audio feature 用 torchcodec 解码，transformers 的 load_audio 用 librosa 回退）。
+安装依赖为 `torch==2.12.0` + `torch_npu==2.12.0`（NPU 适配，torch_npu 2.12 硬性要求 torch 2.12）+ `.[torch,testing,vision]` + `librosa` + `torchcodec` + 可选依赖集（timm/av/pyctcdecode/peft/optuna/quanto/galore/apollo 等，bitsandbytes/torchao/liger/ray/lomo 软失败不阻断）。detectron2/executorch/flash-attn/MPS 类无法在 aarch64 CPU 安装，保持跳过。
 
 > 已知环境特有失败：`test_qkv_chunk_rope_permute_with_fp8_quantization` 在 ARM64 CPU runner 上（triton 3.x 可用但 CPU 后端行为异常）会失败——上游测试假定 triton 在 GPU 上运行，属环境差异，非工作流问题。
 
