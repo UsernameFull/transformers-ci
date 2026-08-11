@@ -156,31 +156,53 @@ jobs:
             || echo "warning: torch_npu install failed, continuing with CPU torch"
           python -m pip install -e ".[torch,testing,vision]"
           python -m pip install librosa torchcodec ${EXTRA_PIP}
-          python -m pip install \
-            timm av pyctcdecode IPython optuna pytesseract kernels schedulefree wandb \
-            optimum-quanto galore_torch apollo_torch torch-optimi grokadamw peft
-          python -m pip install bitsandbytes torchao liger-kernel "ray[tune]" lomo_optim hqq \
-            || echo "warning: some optional deps unavailable on aarch64"
 
-      - name: Diagnose import failure
+      - name: Probe transformers import
         run: |
           python - <<'EOF'
-          import sys
-          import torch
-          print("torch:", torch.__version__)
-          try:
-              import torch_npu
-              print("torch_npu ok, npu available:", torch.npu.is_available())
-          except Exception:
-              import traceback
-              print("torch_npu import FAILED:")
-              traceback.print_exc()
           import traceback
           try:
               from transformers.testing_utils import is_clearml_available
-              print("transformers.testing_utils import OK")
+              print("PROBE: import OK")
           except Exception:
-              print("transformers.testing_utils import FAILED:")
+              print("PROBE: import FAILED")
+              traceback.print_exc()
+          EOF
+
+      - name: Install optional dependencies (A)
+        working-directory: transformers
+        run: |
+          python -m pip install \
+            timm av pyctcdecode IPython optuna pytesseract kernels schedulefree wandb \
+            optimum-quanto galore_torch apollo_torch torch-optimi grokadamw peft
+
+      - name: Probe transformers import (after A)
+        run: |
+          python - <<'EOF'
+          import traceback
+          try:
+              from transformers.testing_utils import is_clearml_available
+              print("PROBE-A: import OK")
+          except Exception:
+              print("PROBE-A: import FAILED")
+              traceback.print_exc()
+          EOF
+
+      - name: Install optional dependencies (B)
+        working-directory: transformers
+        run: |
+          python -m pip install bitsandbytes torchao liger-kernel "ray[tune]" lomo_optim hqq \
+            || echo "warning: some optional deps unavailable on aarch64"
+
+      - name: Probe transformers import (after B)
+        run: |
+          python - <<'EOF'
+          import traceback
+          try:
+              from transformers.testing_utils import is_clearml_available
+              print("PROBE-B: import OK")
+          except Exception:
+              print("PROBE-B: import FAILED")
               traceback.print_exc()
           EOF
 
