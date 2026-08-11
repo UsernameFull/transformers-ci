@@ -169,20 +169,83 @@ jobs:
               traceback.print_exc()
           EOF
 
-      - name: Install optional dependencies (A1)
-        working-directory: transformers
-        run: |
-          python -m pip install timm av pyctcdecode IPython optuna pytesseract
-
-      - name: Probe transformers import (after A1)
+      - name: Install optional deps (timm)
+        run: python -m pip install timm
+      - name: Probe (after timm)
         run: |
           python - <<'EOF'
           import traceback
           try:
               from transformers.testing_utils import is_clearml_available
-              print("PROBE-A1: import OK")
+              print("P-timm: OK")
           except Exception:
-              print("PROBE-A1: import FAILED")
+              print("P-timm: FAILED")
+              traceback.print_exc()
+          EOF
+      - name: Install optional deps (av)
+        run: python -m pip install av
+      - name: Probe (after av)
+        run: |
+          python - <<'EOF'
+          import traceback
+          try:
+              from transformers.testing_utils import is_clearml_available
+              print("P-av: OK")
+          except Exception:
+              print("P-av: FAILED")
+              traceback.print_exc()
+          EOF
+      - name: Install optional deps (pyctcdecode)
+        run: python -m pip install pyctcdecode
+      - name: Probe (after pyctcdecode)
+        run: |
+          python - <<'EOF'
+          import traceback
+          try:
+              from transformers.testing_utils import is_clearml_available
+              print("P-pyctcdecode: OK")
+          except Exception:
+              print("P-pyctcdecode: FAILED")
+              traceback.print_exc()
+          EOF
+      - name: Install optional deps (IPython)
+        run: python -m pip install IPython
+      - name: Probe (after IPython)
+        run: |
+          python - <<'EOF'
+          import traceback
+          try:
+              from transformers.testing_utils import is_clearml_available
+              print("P-IPython: OK")
+          except Exception:
+              print("P-IPython: FAILED")
+              traceback.print_exc()
+          EOF
+      - name: Install optional deps (optuna)
+        run: python -m pip install optuna
+      - name: Probe (after optuna)
+        run: |
+          python - <<'EOF'
+          import traceback
+          try:
+              from transformers.testing_utils import is_clearml_available
+              print("P-optuna: OK")
+          except Exception:
+              print("P-optuna: FAILED")
+              traceback.print_exc()
+          EOF
+      - name: Install optional deps (pytesseract)
+        run: python -m pip install pytesseract
+      - name: Probe (after pytesseract)
+        run: |
+          python - <<'EOF'
+          import traceback
+          try:
+              from transformers.testing_utils import is_clearml_available
+              print("P-pytesseract: OK")
+          except Exception:
+              print("P-pytesseract: FAILED")
+              traceback.print_exc()
           EOF
 
       - name: Install optional dependencies (A2)
