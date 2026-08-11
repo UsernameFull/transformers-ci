@@ -169,23 +169,52 @@ jobs:
               traceback.print_exc()
           EOF
 
-      - name: Install optional dependencies (A)
+      - name: Install optional dependencies (A1)
         working-directory: transformers
         run: |
-          python -m pip install \
-            timm av pyctcdecode IPython optuna pytesseract kernels schedulefree wandb \
-            optimum-quanto galore_torch apollo_torch torch-optimi grokadamw peft
+          python -m pip install timm av pyctcdecode IPython optuna pytesseract
 
-      - name: Probe transformers import (after A)
+      - name: Probe transformers import (after A1)
         run: |
           python - <<'EOF'
           import traceback
           try:
               from transformers.testing_utils import is_clearml_available
-              print("PROBE-A: import OK")
+              print("PROBE-A1: import OK")
           except Exception:
-              print("PROBE-A: import FAILED")
-              traceback.print_exc()
+              print("PROBE-A1: import FAILED")
+          EOF
+
+      - name: Install optional dependencies (A2)
+        working-directory: transformers
+        run: |
+          python -m pip install kernels schedulefree wandb
+
+      - name: Probe transformers import (after A2)
+        run: |
+          python - <<'EOF'
+          import traceback
+          try:
+              from transformers.testing_utils import is_clearml_available
+              print("PROBE-A2: import OK")
+          except Exception:
+              print("PROBE-A2: import FAILED")
+          EOF
+
+      - name: Install optional dependencies (A3)
+        working-directory: transformers
+        run: |
+          python -m pip install optimum-quanto galore_torch apollo_torch torch-optimi grokadamw peft
+
+      - name: Probe transformers import (after A3)
+        run: |
+          python - <<'EOF'
+          import traceback
+          try:
+              from transformers.testing_utils import is_clearml_available
+              print("PROBE-A3: import OK")
+          except Exception:
+              print("PROBE-A3: import FAILED")
           EOF
 
       - name: Install optional dependencies (B)
@@ -203,7 +232,6 @@ jobs:
               print("PROBE-B: import OK")
           except Exception:
               print("PROBE-B: import FAILED")
-              traceback.print_exc()
           EOF
 
       - name: Run tests
