@@ -162,6 +162,28 @@ jobs:
           python -m pip install bitsandbytes torchao liger-kernel "ray[tune]" lomo_optim hqq \
             || echo "warning: some optional deps unavailable on aarch64"
 
+      - name: Diagnose import failure
+        run: |
+          python - <<'EOF'
+          import sys
+          import torch
+          print("torch:", torch.__version__)
+          try:
+              import torch_npu
+              print("torch_npu ok, npu available:", torch.npu.is_available())
+          except Exception:
+              import traceback
+              print("torch_npu import FAILED:")
+              traceback.print_exc()
+          import traceback
+          try:
+              from transformers.testing_utils import is_clearml_available
+              print("transformers.testing_utils import OK")
+          except Exception:
+              print("transformers.testing_utils import FAILED:")
+              traceback.print_exc()
+          EOF
+
       - name: Run tests
         working-directory: transformers
         run: |
