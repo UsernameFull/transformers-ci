@@ -158,8 +158,8 @@ jobs:
           python -m pip install librosa torchcodec ${EXTRA_PIP}
           python -m pip install \
             timm av pyctcdecode IPython optuna pytesseract kernels schedulefree wandb \
-            quanto galore-torch apollo-optimizers torch-optimi grokadamw hqq peft
-          python -m pip install bitsandbytes torchao liger-kernel "ray[tune]" lomo \
+            optimum-quanto galore_torch apollo_torch torch-optimi grokadamw peft
+          python -m pip install bitsandbytes torchao liger-kernel "ray[tune]" lomo_optim hqq \
             || echo "warning: some optional deps unavailable on aarch64"
 
       - name: Run tests
