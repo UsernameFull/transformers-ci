@@ -163,6 +163,23 @@ jobs:
           python -m pip install bitsandbytes torchao liger-kernel "ray[tune]" lomo_optim hqq \
             || echo "warning: some optional deps unavailable on aarch64"
 
+      - name: Diagnose integration import
+        working-directory: transformers
+        run: |
+          python - <<'PY'
+          import importlib
+          import traceback
+
+          try:
+              module = importlib.import_module(
+                  "transformers.integrations.integration_utils"
+              )
+              print("integration_utils import OK")
+              print("is_clearml_available:", module.is_clearml_available())
+          except Exception:
+              traceback.print_exc()
+              raise
+
       - name: Run tests
         working-directory: transformers
         run: |
