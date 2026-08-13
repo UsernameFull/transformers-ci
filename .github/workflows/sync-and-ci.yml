@@ -156,12 +156,12 @@ jobs:
           python -m pip install torch_npu==2.10.0.post4
           python -m pip install -e ".[torch,testing,vision]"
           python -m pip install librosa torchcodec ${EXTRA_PIP}
-          python -m pip install -U "numpy>=2.0,<2.8" scipy
           python -m pip install \
             timm av pyctcdecode IPython optuna pytesseract kernels schedulefree wandb \
             optimum-quanto galore_torch apollo_torch torch-optimi grokadamw peft
           python -m pip install bitsandbytes torchao liger-kernel "ray[tune]" lomo_optim hqq \
             || echo "warning: some optional deps unavailable on aarch64"
+          python -m pip install -U "numpy>=2.0,<2.8" scipy
 
       - name: Diagnose integration import
         working-directory: transformers
