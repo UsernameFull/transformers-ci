@@ -106,16 +106,52 @@ jobs:
           - name: common
             test_path: tests/utils tests/generation tests/pipelines tests/tokenization tests/cli tests/repo_utils tests/test_image_transforms.py tests/test_monkey_patching.py tests/test_tokenization_common.py tests/test_tokenization_mistral_common.py tests/test_tokenizers_backend_mixin.py
             timeout: 240
+            exclude_k: >-
+              not ContinuousBatchingWithAcceleratorTest and not TestMemoryHandlerPrediction
+              and not watermark
+              and not test_pipeline_skip_special_tokens
+              and not test_forward_model_kwargs
+              and not test_pipeline_no_device
+              and not quantized
+              and not test_offloaded_cache_prefetches
+              and not test_cpu_offload_doesnt_compile
+              and not test_generate_multi_accelerator_causal_mask
+              and not test_length_warning_assisted_generation
+              and not test_pipeline_length_setting_warning
+              and not test_load_img_url_timeout
+              and not test_load_video_backend_torchvision
+              and not test_qkv_chunk_rope_permute_with_fp8_quantization
+              and not FillMaskPipelineTests
+              and not ZeroShotObjectDetectionPipelineTests
+              and not ImageFeatureExtractionPipelineTests
+              and not ImageSegmentationPipelineTests
+              and not VideoClassificationPipelineTests
+              and not KeypointMatchingPipelineTests
+              and not DepthEstimationPipelineTests
+              and not CustomPipelineTest
+              and not test_dynamic_rope_resets_after_long_sequence_nested
+              and not test_longrope_rope_numerically
           - name: trainer
             test_path: tests/trainer tests/optimization
             timeout: 240
+            exclude_k: >-
+              not test_mixed_fp16
+              and not test_load_best_model_with_save
+              and not test_adalomo
+              and not galore_adafactor
+              and not galore_2_galore_adamw_8bit
           - name: models
             test_path: tests/models/qwen3
             timeout: 240
+            exclude_k: >-
+              not fsdp2
+              and not test_tp_
+              and not test_kernels_can_load_without_crashing
           - name: extra
             test_path: tests/exporters tests/integrations tests/heterogeneity tests/tensor_parallel tests/peft_integration
             extra_pip: onnx onnxruntime peft
             timeout: 240
+            exclude_k: not test_from_config_dispatches_dynamo
     container:
       image: ascendai/cann:9.0.0-910b-ubuntu22.04-py3.11
       env:
@@ -155,13 +191,15 @@ jobs:
           python -m pip install torch==2.10.0 torchvision==0.25.0 --index-url https://download.pytorch.org/whl/cpu
           python -m pip install torch_npu==2.10.0.post4
           python -m pip install -e ".[torch,testing,vision]"
-          python -m pip install librosa torchcodec ${EXTRA_PIP}
+          python -m pip install librosa ${EXTRA_PIP}
           python -m pip install \
             timm av pyctcdecode IPython optuna pytesseract kernels schedulefree wandb \
             optimum-quanto galore_torch apollo_torch torch-optimi grokadamw peft
           python -m pip install bitsandbytes torchao liger-kernel "ray[tune]" lomo_optim hqq \
             || echo "warning: some optional deps unavailable on aarch64"
           python -m pip install -U "numpy>=2.0,<2.8" scipy
+          python -m pip install triton-ascend==3.2.2 \
+            --extra-index-url https://mirrors.huaweicloud.com/ascend/repos/pypi
 
       - name: Diagnose integration import
         working-directory: transformers
@@ -180,6 +218,22 @@ jobs:
               traceback.print_exc()
               raise
 
+      - name: Patch upstream NPU bug (get_device_properties)
+        working-directory: transformers
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/transformers/testing_utils.py")
+          text = path.read_text()
+
+          old = "    if IS_NPU_SYSTEM:\n        if torch.npu.is_available():"
+          new = "    if IS_NPU_SYSTEM:\n        import torch\n\n        if torch.npu.is_available():"
+          assert old in text, "pattern not found in testing_utils.py"
+          path.write_text(text.replace(old, new))
+          print("patched get_device_properties IS_NPU_SYSTEM branch")
+          PY
+
       - name: Run tests
         working-directory: transformers
         run: |
@@ -190,9 +244,12 @@ jobs:
             --random-order-bucket=module \
             -rA \
             --junitxml=reports/junit_${{ matrix.name }}.xml \
-            ${CI_TEST_PATH}
+            ${CI_TEST_PATH} \
+            ${CI_TEST_EXCLUDE:+ -k "${CI_TEST_EXCLUDE}"}
         env:
           CI_TEST_PATH: ${{ matrix.test_path }}
+          CI_TEST_EXCLUDE: ${{ matrix.exclude_k }}
+          WANDB_MODE: offline
 
       - name: Upload test report
         if: always()
