@@ -180,7 +180,7 @@ jobs:
       - name: Install system dependencies
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends ffmpeg tesseract-ocr
+          apt-get install -y --no-install-recommends ffmpeg tesseract-ocr openmpi-bin libopenmpi-dev libaio-dev
 
       - name: Install dependencies
         working-directory: transformers
@@ -195,8 +195,12 @@ jobs:
           python -m pip install \
             timm av pyctcdecode IPython optuna pytesseract kernels schedulefree wandb \
             optimum-quanto galore_torch apollo_torch torch-optimi grokadamw peft
-          python -m pip install bitsandbytes torchao liger-kernel "ray[tune]" lomo_optim hqq "deepspeed[async-io]" mpi4py \
+          python -m pip install bitsandbytes torchao liger-kernel "ray[tune]" lomo_optim hqq mpi4py \
             || echo "warning: some optional deps unavailable on aarch64"
+          python -m pip install deepspeed \
+            || echo "warning: deepspeed unavailable on aarch64"
+          DS_BUILD_AIO=1 python -m pip install --no-binary deepspeed "deepspeed[async-io]" \
+            || echo "warning: deepspeed async-io build failed, falling back to plain deepspeed"
           python -m pip install -U "numpy>=2.0,<2.8" scipy
           python -m pip install triton-ascend==3.2.2 \
             --extra-index-url https://mirrors.huaweicloud.com/ascend/repos/pypi
