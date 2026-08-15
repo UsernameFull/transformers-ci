@@ -12,14 +12,6 @@ on:
         required: false
         type: boolean
         default: false
-      debug_test_path:
-        description: "Pytest path for the debug entry (default: deepspeed failing test files)"
-        required: false
-        type: string
-      debug_k:
-        description: "-k filter for the debug entry (default: deepspeed/resize cases)"
-        required: false
-        type: string
 
   schedule:
     - cron: "0 3 * * *"
@@ -109,70 +101,21 @@ jobs:
 
   ci:
     name: CI (${{ matrix.name }})
-    if: >-
-      ${{ (inputs.debug == true && matrix.is_debug == true) ||
-           (inputs.debug != true && matrix.is_debug != true) }}
     needs: sync
     runs-on: linux-aarch64-a2-2
     timeout-minutes: ${{ needs.sync.outputs.run_slow == '1' && 600 || matrix.timeout }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: common
-            test_path: tests/utils tests/generation tests/pipelines tests/tokenization tests/cli tests/repo_utils tests/test_image_transforms.py tests/test_monkey_patching.py tests/test_tokenization_common.py tests/test_tokenization_mistral_common.py tests/test_tokenizers_backend_mixin.py
-            timeout: 240
-            exclude_k: >-
-              not ContinuousBatchingWithAcceleratorTest and not TestMemoryHandlerPrediction
-              and not watermark
-              and not test_pipeline_skip_special_tokens
-              and not test_forward_model_kwargs
-              and not test_pipeline_no_device
-              and not quantized
-              and not test_offloaded_cache_prefetches
-              and not test_cpu_offload_doesnt_compile
-              and not test_generate_multi_accelerator_causal_mask
-              and not test_length_warning_assisted_generation
-              and not test_pipeline_length_setting_warning
-              and not test_load_img_url_timeout
-              and not test_load_video_backend_torchvision
-              and not test_qkv_chunk_rope_permute_with_fp8_quantization
-              and not FillMaskPipelineTests
-              and not ZeroShotObjectDetectionPipelineTests
-              and not ImageFeatureExtractionPipelineTests
-              and not ImageSegmentationPipelineTests
-              and not VideoClassificationPipelineTests
-              and not KeypointMatchingPipelineTests
-              and not DepthEstimationPipelineTests
-              and not CustomPipelineTest
-              and not test_dynamic_rope_resets_after_long_sequence_nested
-              and not test_longrope_rope_numerically
-          - name: trainer
-            test_path: tests/trainer tests/optimization
-            timeout: 240
-            exclude_k: >-
-              not test_mixed_fp16
-              and not test_load_best_model_with_save
-              and not test_adalomo
-              and not galore_adafactor
-              and not galore_2_galore_adamw_8bit
-          - name: models
-            test_path: tests/models/qwen3
-            timeout: 240
-            exclude_k: >-
-              not fsdp2
-              and not test_tp_
-              and not test_kernels_can_load_without_crashing
-          - name: extra
-            test_path: tests/exporters tests/integrations tests/heterogeneity tests/tensor_parallel tests/peft_integration
-            extra_pip: onnx onnxruntime peft
-            timeout: 240
-            exclude_k: not test_from_config_dispatches_dynamo
-          - name: debug
-            is_debug: true
-            test_path: ${{ inputs.debug_test_path || 'tests/trainer/distributed/test_trainer_distributed_deepspeed.py tests/models/qwen3/test_modeling_qwen3.py' }}
-            timeout: 240
-            exclude_k: ${{ inputs.debug_k || 'deepspeed or resize_embeddings or resize_tokens_embeddings' }}
+        include: >-
+          ${{ fromJSON(inputs.debug == true && '[
+            {"name":"debug","test_path":"tests/trainer/distributed/test_trainer_distributed_deepspeed.py tests/models/qwen3/test_modeling_qwen3.py","timeout":240,"exclude_k":"deepspeed or resize_embeddings or resize_tokens_embeddings"}
+          ]' || '[
+            {"name":"common","test_path":"tests/utils tests/generation tests/pipelines tests/tokenization tests/cli tests/repo_utils tests/test_image_transforms.py tests/test_monkey_patching.py tests/test_tokenization_common.py tests/test_tokenization_mistral_common.py tests/test_tokenizers_backend_mixin.py","timeout":240,"exclude_k":"not ContinuousBatchingWithAcceleratorTest and not TestMemoryHandlerPrediction and not watermark and not test_pipeline_skip_special_tokens and not test_forward_model_kwargs and not test_pipeline_no_device and not quantized and not test_offloaded_cache_prefetches and not test_cpu_offload_doesnt_compile and not test_generate_multi_accelerator_causal_mask and not test_length_warning_assisted_generation and not test_pipeline_length_setting_warning and not test_load_img_url_timeout and not test_load_video_backend_torchvision and not test_qkv_chunk_rope_permute_with_fp8_quantization and not FillMaskPipelineTests and not ZeroShotObjectDetectionPipelineTests and not ImageFeatureExtractionPipelineTests and not ImageSegmentationPipelineTests and not VideoClassificationPipelineTests and not KeypointMatchingPipelineTests and not DepthEstimationPipelineTests and not CustomPipelineTest and not test_dynamic_rope_resets_after_long_sequence_nested and not test_longrope_rope_numerically"},
+            {"name":"trainer","test_path":"tests/trainer tests/optimization","timeout":240,"exclude_k":"not test_mixed_fp16 and not test_load_best_model_with_save and not test_adalomo and not galore_adafactor and not galore_2_galore_adamw_8bit"},
+            {"name":"models","test_path":"tests/models/qwen3","timeout":240,"exclude_k":"not fsdp2 and not test_tp_ and not test_kernels_can_load_without_crashing"},
+            {"name":"extra","test_path":"tests/exporters tests/integrations tests/heterogeneity tests/tensor_parallel tests/peft_integration","extra_pip":"onnx onnxruntime peft","timeout":240,"exclude_k":"not test_from_config_dispatches_dynamo"}
+          ]') }}
     container:
       image: ascendai/cann:9.0.0-910b-ubuntu22.04-py3.11
       env:
