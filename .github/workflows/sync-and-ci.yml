@@ -197,9 +197,9 @@ jobs:
             optimum-quanto galore_torch apollo_torch torch-optimi grokadamw peft
           python -m pip install bitsandbytes torchao liger-kernel "ray[tune]" lomo_optim hqq mpi4py \
             || echo "warning: some optional deps unavailable on aarch64"
-          python -m pip install deepspeed \
+          python -m pip install deepspeed==0.19.2 \
             || echo "warning: deepspeed unavailable on aarch64"
-          DS_BUILD_AIO=1 python -m pip install --no-binary deepspeed "deepspeed[async-io]" \
+          DS_BUILD_AIO=1 python -m pip install --no-binary "deepspeed[async-io]==0.19.2" \
             || echo "warning: deepspeed async-io build failed, falling back to plain deepspeed"
           python -m pip install -U "numpy>=2.0,<2.8" scipy
           python -m pip install triton-ascend==3.2.2 \
