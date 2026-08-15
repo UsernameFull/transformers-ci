@@ -109,24 +109,13 @@ jobs:
           - name: trainer
             test_path: tests/trainer tests/optimization
             timeout: 240
-            exclude_k: >-
-              not test_mixed_fp16
-              and not test_load_best_model_with_save
-              and not test_adalomo
-              and not galore_adafactor
-              and not galore_2_galore_adamw_8bit
           - name: models
             test_path: tests/models/qwen3
             timeout: 240
-            exclude_k: >-
-              not fsdp2
-              and not test_tp_
-              and not test_kernels_can_load_without_crashing
           - name: extra
             test_path: tests/exporters tests/integrations tests/heterogeneity tests/tensor_parallel tests/peft_integration
             extra_pip: onnx onnxruntime peft
             timeout: 240
-            exclude_k: not test_from_config_dispatches_dynamo
     container:
       image: ascendai/cann:9.0.0-910b-ubuntu22.04-py3.11
       env:
