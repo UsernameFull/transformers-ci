@@ -106,31 +106,6 @@ jobs:
           - name: common
             test_path: tests/utils tests/generation tests/pipelines tests/tokenization tests/cli tests/repo_utils tests/test_image_transforms.py tests/test_monkey_patching.py tests/test_tokenization_common.py tests/test_tokenization_mistral_common.py tests/test_tokenizers_backend_mixin.py
             timeout: 240
-            exclude_k: >-
-              not ContinuousBatchingWithAcceleratorTest and not TestMemoryHandlerPrediction
-              and not watermark
-              and not test_pipeline_skip_special_tokens
-              and not test_forward_model_kwargs
-              and not test_pipeline_no_device
-              and not quantized
-              and not test_offloaded_cache_prefetches
-              and not test_cpu_offload_doesnt_compile
-              and not test_generate_multi_accelerator_causal_mask
-              and not test_length_warning_assisted_generation
-              and not test_pipeline_length_setting_warning
-              and not test_load_img_url_timeout
-              and not test_load_video_backend_torchvision
-              and not test_qkv_chunk_rope_permute_with_fp8_quantization
-              and not FillMaskPipelineTests
-              and not ZeroShotObjectDetectionPipelineTests
-              and not ImageFeatureExtractionPipelineTests
-              and not ImageSegmentationPipelineTests
-              and not VideoClassificationPipelineTests
-              and not KeypointMatchingPipelineTests
-              and not DepthEstimationPipelineTests
-              and not CustomPipelineTest
-              and not test_dynamic_rope_resets_after_long_sequence_nested
-              and not test_longrope_rope_numerically
           - name: trainer
             test_path: tests/trainer tests/optimization
             timeout: 240
