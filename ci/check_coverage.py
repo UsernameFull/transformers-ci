@@ -13,7 +13,6 @@ New tests/models/* directories are informational only (models are selected on pu
 """
 
 import os
-import re
 import sys
 
 try:
@@ -44,26 +43,13 @@ def load_exclusions() -> set[str]:
 
 
 def load_covered_from_workflow() -> set[str]:
-    """Extract covered test paths from the ci matrix test_path entries.
-
-    The workflow matrix uses `include: ${{ fromJSON(...) }}`, so the parsed
-    value may be an expression string instead of a list. Fall back to scanning
-    the raw workflow text for every test_path inside the matrix JSON literals
-    (union of debug and normal entries, so coverage never vanishes).
-    """
+    """Extract covered test paths from the ci matrix test_path entries."""
     with open(WORKFLOW, encoding="utf-8") as f:
-        text = f.read()
+        data = yaml.safe_load(f)
     covered: set[str] = set()
-    data = yaml.safe_load(text)
-    include = data["jobs"]["ci"]["strategy"]["matrix"]["include"]
-    if isinstance(include, list):
-        for entry in include:
-            if isinstance(entry, dict):
-                for item in entry.get("test_path", "").split():
-                    covered.add(item)
-    if not covered:
-        for item in re.findall(r'"test_path":"([^"]+)"', text):
-            covered.update(item.split())
+    for entry in data["jobs"]["ci"]["strategy"]["matrix"]["include"]:
+        for item in entry.get("test_path", "").split():
+            covered.add(item)
     return covered
 
 
