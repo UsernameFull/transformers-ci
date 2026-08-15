@@ -7,6 +7,19 @@ on:
         description: "Override the Python version (default: Python 3.12)"
         required: false
         type: string
+      debug:
+        description: "Run only the debug job (failing cases), skip common/models/trainer/extra"
+        required: false
+        type: boolean
+        default: false
+      debug_test_path:
+        description: "Pytest path for the debug job (default: deepspeed failing test files)"
+        required: false
+        type: string
+      debug_k:
+        description: "-k filter for the debug job (default: deepspeed/resize cases)"
+        required: false
+        type: string
 
   schedule:
     - cron: "0 3 * * *"
@@ -96,6 +109,7 @@ jobs:
 
   ci:
     name: CI (${{ matrix.name }})
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.debug == 'true') }}
     needs: sync
     runs-on: linux-aarch64-a2-2
     timeout-minutes: ${{ needs.sync.outputs.run_slow == '1' && 600 || matrix.timeout }}
@@ -260,6 +274,121 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-reports-${{ matrix.name }}
+          path: transformers/reports/
+          if-no-files-found: warn
+
+  debug:
+    name: CI (debug)
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.debug == 'true' }}
+    needs: sync
+    runs-on: linux-aarch64-a2-2
+    timeout-minutes: 240
+    container:
+      image: ascendai/cann:9.0.0-910b-ubuntu22.04-py3.11
+      env:
+        UV_NO_SYNC: 1
+    permissions:
+      contents: read
+    env:
+      HF_ENDPOINT: ${{ vars.HF_ENDPOINT || 'https://huggingface.co' }}
+      HF_HOME: /root/.cache/huggingface
+      PYTHON_VERSION: ${{ inputs.python_version_override || '3.12' }}
+      RUN_SLOW: ${{ needs.sync.outputs.run_slow }}
+    steps:
+      - name: Checkout upstream commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.sync.outputs.upstream_sha }}
+          path: transformers
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install system dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ffmpeg tesseract-ocr openmpi-bin libopenmpi-dev libaio-dev
+
+      - name: Install dependencies
+        working-directory: transformers
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch==2.10.0 torchvision==0.25.0 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install torch_npu==2.10.0.post4
+          python -m pip install -e ".[torch,testing,vision]"
+          python -m pip install librosa
+          python -m pip install \
+            timm av pyctcdecode IPython optuna pytesseract kernels schedulefree wandb \
+            optimum-quanto galore_torch apollo_torch torch-optimi grokadamw peft
+          python -m pip install bitsandbytes torchao liger-kernel "ray[tune]" lomo_optim hqq mpi4py \
+            || echo "warning: some optional deps unavailable on aarch64"
+          python -m pip install deepspeed==0.19.2 \
+            || echo "warning: deepspeed unavailable on aarch64"
+          DS_BUILD_AIO=1 python -m pip install --no-binary "deepspeed[async-io]==0.19.2" \
+            || echo "warning: deepspeed async-io build failed, falling back to plain deepspeed"
+          python -m pip install -U "numpy>=2.0,<2.8" scipy
+          python -m pip install triton-ascend==3.2.2 \
+            --extra-index-url https://mirrors.huaweicloud.com/ascend/repos/pypi
+
+      - name: Diagnose integration import
+        working-directory: transformers
+        run: |
+          python - <<'PY'
+          import importlib
+          import traceback
+
+          try:
+              module = importlib.import_module(
+                  "transformers.integrations.integration_utils"
+              )
+              print("integration_utils import OK")
+              print("is_clearml_available:", module.is_clearml_available())
+          except Exception:
+              traceback.print_exc()
+              raise
+
+      - name: Patch upstream NPU bug (get_device_properties)
+        working-directory: transformers
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/transformers/testing_utils.py")
+          text = path.read_text()
+
+          old = "    if IS_NPU_SYSTEM:\n        if torch.npu.is_available():"
+          new = "    if IS_NPU_SYSTEM:\n        import torch\n\n        if torch.npu.is_available():"
+          assert old in text, "pattern not found in testing_utils.py"
+          path.write_text(text.replace(old, new))
+          print("patched get_device_properties IS_NPU_SYSTEM branch")
+          PY
+
+      - name: Run tests (debug)
+        working-directory: transformers
+        run: |
+          python -m pytest \
+            -p random_order \
+            -n 2 \
+            --dist=loadfile \
+            --random-order-bucket=module \
+            -rA \
+            --junitxml=reports/junit_debug.xml \
+            ${CI_TEST_PATH} \
+            ${CI_TEST_K:+ -k "${CI_TEST_K}"}
+        env:
+          CI_TEST_PATH: ${{ inputs.debug_test_path || 'tests/trainer/distributed/test_trainer_distributed_deepspeed.py tests/models/qwen3/test_modeling_qwen3.py' }}
+          CI_TEST_K: ${{ inputs.debug_k || 'deepspeed or resize_embeddings or resize_tokens_embeddings' }}
+          WANDB_MODE: offline
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-debug
           path: transformers/reports/
           if-no-files-found: warn
 
