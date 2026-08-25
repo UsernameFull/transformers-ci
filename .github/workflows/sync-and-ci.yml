@@ -125,6 +125,7 @@ jobs:
     env:
       HF_ENDPOINT: ${{ vars.HF_ENDPOINT || 'https://huggingface.co' }}
       HF_HOME: /root/.cache/huggingface
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
       PYTHON_VERSION: ${{ inputs.python_version_override || '3.12' }}
       RUN_SLOW: ${{ needs.sync.outputs.run_slow }}
     steps:
@@ -169,6 +170,8 @@ jobs:
           python -m pip install triton-ascend==3.2.2 \
             --extra-index-url https://mirrors.huaweicloud.com/ascend/repos/pypi
           python -m pip install "pytest>=8.4.0" "pytest-xdist>=3.8.0"
+          python -m pip install torchcodec \
+            || echo "warning: torchcodec unavailable, audio decoding tests will fail"
 
       - name: Diagnose integration import
         working-directory: transformers
@@ -203,11 +206,59 @@ jobs:
           print("patched get_device_properties IS_NPU_SYSTEM branch")
           PY
 
+      - name: Enable native-NPU FlashAttention-2 tests
+        working-directory: ${{ github.workspace }}
+        run: |
+          cat > npu_fa2_unlock.py <<'PY'
+          """Unlock ``@require_flash_attn`` tests on Ascend NPU.
+
+          Upstream ships a native NPU FlashAttention-2 implementation
+          (transformers.integrations.npu_flash_attention) and accepts
+          attn_implementation="flash_attention_2" on NPU without the CUDA-only
+          ``flash-attn`` package. The ``require_flash_attn`` decorator however
+          keys off ``is_flash_attn_2_available()``, which demands that package
+          plus a CUDA/MLU device, so every gated test is skipped on NPU.
+
+          This plugin replaces ``transformers.testing_utils.require_flash_attn``
+          so it no longer skips on NPU systems. The availability helpers are
+          intentionally left untouched: modeling internals (e.g.
+          flash_attn_supports_top_left_mask) rely on them to select
+          NPU-specific mask semantics.
+          """
+
+          import unittest
+
+
+          def _on_npu():
+              try:
+                  import torch
+
+                  return hasattr(torch, "npu") and bool(torch.npu.is_available())
+              except Exception:
+                  return False
+
+
+          if _on_npu():
+
+              def _require_flash_attn(test_case):
+                  """NPU has native FA2 support: run the test unconditionally."""
+                  return test_case
+
+              try:
+                  import transformers.testing_utils as _tu
+
+                  _tu.require_flash_attn = _require_flash_attn
+                  print("npu_fa2_unlock: require_flash_attn unlocked for NPU")
+              except Exception as exc:
+                  print(f"npu_fa2_unlock: could not patch require_flash_attn: {exc}")
+          PY
+
       - name: Run tests
         working-directory: transformers
         run: |
           python -m pytest \
             -p random_order \
+            -p npu_fa2_unlock \
             -n 2 \
             --dist=loadfile \
             --random-order-bucket=module \
@@ -218,6 +269,7 @@ jobs:
         env:
           CI_TEST_PATH: ${{ matrix.test_path }}
           CI_TEST_EXCLUDE: ${{ matrix.exclude_k }}
+          PYTHONPATH: ${{ github.workspace }}
           WANDB_MODE: offline
 
       - name: Upload test report
