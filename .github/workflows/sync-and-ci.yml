@@ -142,6 +142,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      - name: Pre-flight NPU status
+        run: npu-smi info
+
       - name: Install system dependencies
         run: |
           apt-get update
@@ -173,17 +176,29 @@ jobs:
           # torchcodec: torch 2.10 pairs with torchcodec 0.10, which has no
           # prebuilt linux-aarch64 wheel (0.13+cpu needs torch>=2.11 and the
           # PyPI default wheel is CUDA-flavoured). Build 0.10 from source for
-          # the common job only; fall back to a clean uninstall on failure.
+          # the common job only; cache the wheel in the persistent /root/.cache
+          # (keyed by torch major.minor) and fall back to a clean uninstall.
           if [ "${{ matrix.name }}" = "common" ]; then
-            apt-get install -y --no-install-recommends \
-              libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev cmake > /dev/null
-            python -m pip install --quiet ninja || true
-            if python -m pip install --no-build-isolation "torchcodec @ git+https://github.com/pytorch/torchcodec@v0.10.0" \
-              && python -c "import torchcodec"; then
-              echo "torchcodec 0.10 built and importable"
+            TV="$(python -c "import torch; print('.'.join(torch.__version__.split('+')[0].split('.')[:2]))")"
+            CACHE="/root/.cache/wheels/torchcodec-torch${TV}"
+            mkdir -p "${CACHE}"
+            if python -m pip install --no-index --find-links "${CACHE}" torchcodec 2>/dev/null \
+              && python -c "import torchcodec" 2>/dev/null; then
+              echo "torchcodec restored from wheel cache: ${CACHE}"
             else
-              python -m pip uninstall -y torchcodec
-              echo "warning: torchcodec build/import failed, audio decoding tests will fail"
+              python -m pip uninstall -y torchcodec > /dev/null 2>&1 || true
+              apt-get install -y --no-install-recommends \
+                libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev cmake > /dev/null
+              python -m pip install --quiet ninja || true
+              if python -m pip wheel --no-deps --no-build-isolation -w "${CACHE}" \
+                  "torchcodec @ git+https://github.com/pytorch/torchcodec@v0.10.0" \
+                && python -m pip install --no-index --find-links "${CACHE}" torchcodec \
+                && python -c "import torchcodec"; then
+                echo "torchcodec 0.10 built, cached in ${CACHE} and importable"
+              else
+                python -m pip uninstall -y torchcodec
+                echo "warning: torchcodec build/import failed, audio decoding tests will fail"
+              fi
             fi
           fi
 
