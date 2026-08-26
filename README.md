@@ -2,6 +2,8 @@
 
 自动镜像 `huggingface/transformers` 的 `main` 分支，并对每次上游更新执行轻量 CI。该仓库自身长期保持活动，避免 scheduled workflow 因 60 天无 repository activity 被 GitHub 自动停用。
 
+> 📊 测试执行覆盖策略、skip/未执行项去向、失败家族归因详见 [`ci/CI_REPORT.md`](ci/CI_REPORT.md)。
+
 ## 分支结构
 
 ```text
