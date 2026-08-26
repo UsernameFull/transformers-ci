@@ -113,7 +113,7 @@ jobs:
             test_path: tests/models/qwen3
             timeout: 240
           - name: extra
-            test_path: tests/exporters tests/integrations tests/heterogeneity tests/tensor_parallel tests/peft_integration
+            test_path: tests/exporters tests/integrations tests/heterogeneity tests/tensor_parallel tests/pipeline_parallel tests/peft_integration
             extra_pip: onnx onnxruntime peft
             timeout: 240
     container:
@@ -170,8 +170,22 @@ jobs:
           python -m pip install triton-ascend==3.2.2 \
             --extra-index-url https://mirrors.huaweicloud.com/ascend/repos/pypi
           python -m pip install "pytest>=8.4.0" "pytest-xdist>=3.8.0"
-          python -m pip install torchcodec --index-url https://download.pytorch.org/whl/cpu \
-            || echo "warning: torchcodec unavailable, audio decoding tests will fail"
+          # torchcodec: torch 2.10 pairs with torchcodec 0.10, which has no
+          # prebuilt linux-aarch64 wheel (0.13+cpu needs torch>=2.11 and the
+          # PyPI default wheel is CUDA-flavoured). Build 0.10 from source for
+          # the common job only; fall back to a clean uninstall on failure.
+          if [ "${{ matrix.name }}" = "common" ]; then
+            apt-get install -y --no-install-recommends \
+              libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev cmake > /dev/null
+            python -m pip install --quiet ninja || true
+            if python -m pip install --no-build-isolation "torchcodec @ git+https://github.com/pytorch/torchcodec@v0.10.0" \
+              && python -c "import torchcodec"; then
+              echo "torchcodec 0.10 built and importable"
+            else
+              python -m pip uninstall -y torchcodec
+              echo "warning: torchcodec build/import failed, audio decoding tests will fail"
+            fi
+          fi
 
       - name: Diagnose integration import
         working-directory: transformers
