@@ -170,7 +170,7 @@ jobs:
           python -m pip install triton-ascend==3.2.2 \
             --extra-index-url https://mirrors.huaweicloud.com/ascend/repos/pypi
           python -m pip install "pytest>=8.4.0" "pytest-xdist>=3.8.0"
-          python -m pip install torchcodec \
+          python -m pip install torchcodec --index-url https://download.pytorch.org/whl/cpu \
             || echo "warning: torchcodec unavailable, audio decoding tests will fail"
 
       - name: Diagnose integration import
