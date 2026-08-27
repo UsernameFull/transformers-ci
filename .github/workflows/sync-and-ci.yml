@@ -189,7 +189,7 @@ jobs:
               python -m pip uninstall -y torchcodec > /dev/null 2>&1 || true
               apt-get install -y --no-install-recommends \
                 libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev cmake > /dev/null
-              python -m pip install --quiet ninja || true
+              python -m pip install --quiet ninja pybind11 || true
               if I_CONFIRM_THIS_IS_NOT_A_LICENSE_VIOLATION=1 \
                 python -m pip wheel --no-deps --no-build-isolation -w "${CACHE}" \
                   "torchcodec @ git+https://github.com/pytorch/torchcodec@v0.10.0" \
