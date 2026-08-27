@@ -188,7 +188,7 @@ jobs:
             else
               python -m pip uninstall -y torchcodec > /dev/null 2>&1 || true
               apt-get install -y --no-install-recommends \
-                libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev cmake > /dev/null
+                libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev cmake pkg-config > /dev/null
               python -m pip install --quiet ninja pybind11 || true
               PYBIND11_CMAKE=$(python -m pybind11 --cmakedir 2>/dev/null || echo "")
               if [ -n "${PYBIND11_CMAKE}" ]; then
