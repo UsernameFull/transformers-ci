@@ -190,6 +190,10 @@ jobs:
               apt-get install -y --no-install-recommends \
                 libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev cmake > /dev/null
               python -m pip install --quiet ninja pybind11 || true
+              PYBIND11_CMAKE=$(python -m pybind11 --cmakedir 2>/dev/null || echo "")
+              if [ -n "${PYBIND11_CMAKE}" ]; then
+                export CMAKE_PREFIX_PATH="${PYBIND11_CMAKE}:${CMAKE_PREFIX_PATH:-}"
+              fi
               if I_CONFIRM_THIS_IS_NOT_A_LICENSE_VIOLATION=1 \
                 python -m pip wheel --no-deps --no-build-isolation -w "${CACHE}" \
                   "torchcodec @ git+https://github.com/pytorch/torchcodec@v0.10.0" \
