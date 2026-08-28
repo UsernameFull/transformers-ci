@@ -289,12 +289,40 @@ jobs:
                   print(f"npu_fa2_unlock: could not patch require_flash_attn: {exc}")
           PY
 
+      - name: Write NPU distributed port plugin
+        working-directory: ${{ github.workspace }}
+        run: |
+          cat > npu_dist_port.py <<'PY'
+          """Give every pytest-xdist worker a unique torch.distributed MASTER_PORT.
+
+          DeepSpeed/FSDP tests initialize the process group in-process; with
+          ``-n 2 --dist=loadfile`` two workers concurrently bind the default
+          ``MASTER_PORT=29500`` and one fails with EADDRINUSE. Assign each
+          worker a disjoint port range (29500 + worker_index * 1000) so
+          distributed tests no longer collide.
+          """
+
+          import os
+          import re
+
+
+          def pytest_configure(config):
+              worker = os.environ.get("PYTEST_XDIST_WORKER", "gw0")
+              match = re.search(r"gw(\d+)", worker)
+              idx = int(match.group(1)) if match else 0
+              port = 29500 + idx * 1000
+              os.environ["MASTER_PORT"] = str(port)
+              os.environ["MASTER_ADDR"] = "127.0.0.1"
+              print(f"npu_dist_port: worker={worker} MASTER_PORT={port}")
+          PY
+
       - name: Run tests
         working-directory: transformers
         run: |
           python -m pytest \
             -p random_order \
             -p npu_fa2_unlock \
+            -p npu_dist_port \
             -n 2 \
             --dist=loadfile \
             --random-order-bucket=module \
