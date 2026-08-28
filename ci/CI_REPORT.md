@@ -47,7 +47,7 @@
 
 ### 2.6 其他模型目录(~890 文件,`tests/models/<其余模型>`)
 
-既定策略:`models` job 只跑 `tests/models/qwen3` 作为全模型冒烟代表(qwen3 含 generation/trainer/distributed 类用例,覆盖面最广)。跑全部 400+ 模型需上游官方级别的分片集群。Coverage Watch 按顶层目录 `tests/models` 豁免,新模型目录仅信息展示。可考虑未来每周日增加代表性模型抽样。
+既定策略:`models` job 跑 `tests/models/qwen3`(含 generation/trainer/distributed 类用例,覆盖面最广)+ `tests/models/qwen3_5`、`tests/models/qwen3_5_moe`(qwen3.5 家族纳入常态测试)。跑全部 400+ 模型需上游官方级别的分片集群。Coverage Watch 按顶层目录 `tests/models` 豁免,新模型目录仅信息展示。可考虑未来每周日增加代表性模型抽样。
 
 ### 2.7 整目录排除(登记于 `ci/test_exclusions.txt`)
 

@@ -110,7 +110,7 @@ jobs:
             test_path: tests/trainer tests/optimization
             timeout: 240
           - name: models
-            test_path: tests/models/qwen3
+            test_path: tests/models/qwen3 tests/models/qwen3_5 tests/models/qwen3_5_moe
             timeout: 240
           - name: extra
             test_path: tests/exporters tests/integrations tests/heterogeneity tests/tensor_parallel tests/pipeline_parallel tests/peft_integration
