@@ -289,17 +289,26 @@ jobs:
                   print(f"npu_fa2_unlock: could not patch require_flash_attn: {exc}")
           PY
 
-      - name: Write NPU distributed port plugin
+      - name: Write NPU test fixes plugin
         working-directory: ${{ github.workspace }}
         run: |
-          cat > npu_dist_port.py <<'PY'
-          """Give every pytest-xdist worker a unique torch.distributed MASTER_PORT.
+          cat > npu_fixes.py <<'PY'
+          """NPU CI test fixes: unique dist ports + DeepSpeed zero3 config repair.
 
-          DeepSpeed/FSDP tests initialize the process group in-process; with
-          ``-n 2 --dist=loadfile`` two workers concurrently bind the default
-          ``MASTER_PORT=29500`` and one fails with EADDRINUSE. Assign each
-          worker a disjoint port range (29500 + worker_index * 1000) so
-          distributed tests no longer collide.
+          Fix 1 (MASTER_PORT): DeepSpeed/FSDP tests initialize the process group
+          in-process; with ``-n 2 --dist=loadfile`` two workers concurrently bind
+          the default ``MASTER_PORT=29500`` and one fails with EADDRINUSE.
+          Assign each worker a disjoint port range (29500 + worker_index * 1000).
+
+          Fix 2 (DeepSpeed zero3 batch fields): upstream ``_deepspeed_zero3``
+          builds a ``zero_optimization``-only config. Pure-text models only hit
+          ``deepspeed.zero.Init()`` once and pass, but composite models (e.g.
+          Qwen3.5 vision+text) nest ``AutoModel.from_config`` inside the context,
+          which calls ``deepspeed.zero.Init(config_dict_or_path=deepspeed_config())``
+          again; ``DeepSpeedConfig.__init__`` then asserts one of
+          train_batch_size / train_micro_batch_size_per_gpu /
+          gradient_accumulation_steps is present. Patch ``HfDeepSpeedConfig`` to
+          inject ``train_micro_batch_size_per_gpu: 1`` when missing.
           """
 
           import os
@@ -313,7 +322,38 @@ jobs:
               port = 29500 + idx * 1000
               os.environ["MASTER_PORT"] = str(port)
               os.environ["MASTER_ADDR"] = "127.0.0.1"
-              print(f"npu_dist_port: worker={worker} MASTER_PORT={port}")
+              print(f"npu_fixes: worker={worker} MASTER_PORT={port}")
+
+              try:
+                  import transformers.integrations.deepspeed as _ds
+
+                  _orig_init = _ds.HfDeepSpeedConfig.__init__
+
+                  def _init_with_batch_fields(self, config_file_or_dict):
+                      if isinstance(config_file_or_dict, dict):
+                          cfg = config_file_or_dict
+                          has_batch = any(
+                              cfg.get(k) is not None
+                              for k in (
+                                  "train_batch_size",
+                                  "train_micro_batch_size_per_gpu",
+                                  "gradient_accumulation_steps",
+                              )
+                          )
+                          if not has_batch:
+                              cfg = dict(cfg)
+                              cfg["train_micro_batch_size_per_gpu"] = 1
+                              config_file_or_dict = cfg
+                              print(
+                                  "npu_fixes: injected train_micro_batch_size_per_gpu=1 "
+                                  "into HfDeepSpeedConfig"
+                              )
+                      _orig_init(self, config_file_or_dict)
+
+                  _ds.HfDeepSpeedConfig.__init__ = _init_with_batch_fields
+                  print("npu_fixes: HfDeepSpeedConfig batch-field patch installed")
+              except Exception as exc:
+                  print(f"npu_fixes: HfDeepSpeedConfig patch failed: {exc}")
           PY
 
       - name: Run tests
@@ -322,7 +362,7 @@ jobs:
           python -m pytest \
             -p random_order \
             -p npu_fa2_unlock \
-            -p npu_dist_port \
+            -p npu_fixes \
             -n 2 \
             --dist=loadfile \
             --random-order-bucket=module \
