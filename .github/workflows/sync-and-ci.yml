@@ -298,7 +298,9 @@ jobs:
           Fix 1 (MASTER_PORT): DeepSpeed/FSDP tests initialize the process group
           in-process; with ``-n 2 --dist=loadfile`` two workers concurrently bind
           the default ``MASTER_PORT=29500`` and one fails with EADDRINUSE.
-          Assign each worker a disjoint port range (29500 + worker_index * 1000).
+          Assign each worker a disjoint port range (29500 + worker_index * 1000)
+          and set RANK/WORLD_SIZE/LOCAL_RANK so DeepSpeed takes the env:// path
+          (otherwise it falls back to mpi_discovery which hardcodes 29500).
 
           Fix 2 (DeepSpeed zero3 batch fields): upstream ``_deepspeed_zero3``
           builds a ``zero_optimization``-only config. Pure-text models only hit
@@ -322,6 +324,14 @@ jobs:
               port = 29500 + idx * 1000
               os.environ["MASTER_PORT"] = str(port)
               os.environ["MASTER_ADDR"] = "127.0.0.1"
+              # DeepSpeed's init_distributed() checks for RANK/WORLD_SIZE/
+              # LOCAL_RANK/MASTER_ADDR/MASTER_PORT. If any is missing it falls
+              # back to mpi_discovery(), which hardcodes the default port 29500
+              # and ignores our MASTER_PORT. Provide the single-process values so
+              # the env:// path (and our unique ports) is always taken.
+              os.environ.setdefault("RANK", "0")
+              os.environ.setdefault("WORLD_SIZE", "1")
+              os.environ.setdefault("LOCAL_RANK", "0")
               print(f"npu_fixes: worker={worker} MASTER_PORT={port}")
 
               try:
