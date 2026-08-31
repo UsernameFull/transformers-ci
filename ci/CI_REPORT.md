@@ -1,20 +1,22 @@
 # Transformers NPU CI 运行报告
 
-> 数据来源:run [33151865230](https://github.com/UsernameFull/transformers-ci/actions/runs/33151865230)(commit `5f2f2e5a96`,2026-08-28,已含 torchcodec 源码构建修复与 qwen3.5 家族)。
+> 数据来源:run [33348304642](https://github.com/UsernameFull/transformers-ci/actions/runs/33348304642)(commit `3f040d7e80`,2026-08-31,含 torchcodec 源码构建 + npu_fixes 插件)。
 > 本报告记录测试执行覆盖策略、未执行项的去向、以及当前失败家族的归因。上游每日同步,具体失败清单会漂移,但归因框架与豁免理由长期有效。
 
 ## 1. 执行总览
 
 | job | 收集 | 通过 | 失败 | 跳过 |
 |---|---|---|---|---|
-| common | 2099 | 1551 | 77 | 471 |
-| trainer | 610 | 415 | 42 | 153 |
-| models | 1334 | 735 | 56 | 543 |
+| common | 2102 | 1554 | 76 | 472 |
+| trainer | 610 | 406 | 51 | 153 |
+| models | 1394 | 801 | 48 | 545 |
 | extra | 251 | 188 | 1 | 62 |
-| **合计** | **4294** | **2889** | **176** | **1229** |
+| **合计** | **4357** | **2949** | **176** | **1232** |
 
 - 所有 `test_path` 内的测试文件 100% 被 pytest 收集(junit 中无缺失文件、无 collection error、无 deselected——`-k` 排除清单已于 2026-08-15 全部移除,策略为"全量放开,红即信号")。
-- 较上轮(33072980680,144 失败):qwen3.5 家族纳入后 +33 失败,全部为既有环境级家族(Inductor/Triton 12、DistNetworkError 8、ACL 5、deepspeed 参数 4、IndexError 4),无新增模型代码缺陷;common 77(上轮 78,持平)。
+- 三轮 run(33160513916 → 33238763483 → 33348304642)失败集合逐条稳定一致,修复可复现。
+- `npu_fixes` 插件已消除 **DistNetworkError 16 个**(EADDRINUSE,xdist 双 worker 并发抢 29500)+ **deepspeed train_batch_size 4 个**(qwen3.5 复合模型嵌套 `AutoModel.from_config` 触发),models job 由 56 → 48。
+- trainer 42 → 51:上游 8/28 后同步新增测试(APOLLO layerwise DDP 不支持、galore/FSDP 断言等),非插件回归,三轮逐条一致。
 
 ## 2. 未执行项的完整去向
 
@@ -71,14 +73,15 @@ decord ×2(aarch64 无维护轮子)、detectron2 ×2(arm64 编译困难)、ONNXS
 
 | 家族 | 数量 | 归因 | 解除条件 |
 | --- | --- | --- | --- |
-| **ACL-500001** `AclSetCompileopt ... internal ACL of the system is incorrect` | ~45(trainer 30 / common 12 / models 3) | **宿主机驱动/CANN 异常**,非代码问题。证据:①失败点均为各进程第一个 NPU 算子调用(adam 优化器、`tensor.to("npu")`、普通比较运算等互不相关的操作);②双卡同时中招;③独立 run 失败集合逐条一致(确定性复现);④8月24日同环境曾全绿 | 上机排查:`npu-smi info` → `fuser -v /dev/davinci*` 清理残留进程 → 设备复位/重启宿主机;核对宿主 driver/firmware 与容器 CANN 9.0.0 版本配对 |
+| **ACL-500001** `AclSetCompileopt ... internal ACL of the system is incorrect` | ~47(trainer 30 / common 12 / models 5) | **宿主机驱动/CANN 异常**,非代码问题。证据:①失败点均为各进程第一个 NPU 算子调用(adam 优化器、`tensor.to("npu")`、普通比较运算等互不相关的操作);②双卡同时中招;③独立 run 失败集合逐条一致(确定性复现);④8月24日同环境曾全绿 | 上机排查:`npu-smi info` → `fuser -v /dev/davinci*` 清理残留进程 → 设备复位/重启宿主机;核对宿主 driver/firmware 与容器 CANN 9.0.0 版本配对 |
 | ContinuousBatching 缓存池超配 OOM + 显存预测断言 | ~17 | 上游硬编码:默认 `max_memory_percent=0.8/0.9` 按"空闲显存的 80~90%"分配 KV 缓存池,无环境变量开关;`TestMemoryHandlerPrediction` 断言依赖 CUDA 风格 memory stats(NPU 恒返回 delta=0) | 等上游适配 NPU 显存语义 |
 | synthid watermark 巨型张量 OOM | ~5 | 测试构造 488~4882 GiB 单笔分配,物理不可行 | 不可修复,除非上游改测试 |
 | torch.compile / triton-ascend 不兼容 | ~30 | `make_fallback(aten.gelu/split)` decomposition 冲突、`tl.sum(dtype=)` API 差异、flex_attention 无有效 config、`Adam.step(grad_scaler)` 要求 torch≥2.11 | 等 triton-ascend/torch 升级 |
-| deepspeed resize embeddings IndexError(size 0) | 8 | meta-device 下 padding_idx 归零逻辑踩空 | 等上游 |
-| DistNetworkError(server socket 无法监听) | 8 | 多进程分布式测试在容器网络/端口分配下的偶发失败 | 观察;必要时隔离串行跑 |
+| deepspeed resize embeddings IndexError(size 0) | 12 | meta-device 下 padding_idx 归零逻辑踩空;MASTER_PORT 修复后测试跑到更深处,IndexError 成为最终暴露的上游缺陷 | 等上游 |
+| APOLLO layerwise DDP 不支持等上游新增断言 | ~9 | 上游 8/28 后新增测试(APOLLO_ADAMW_LAYERWISE DDP、galore layerwise、FSDP non-rank0 等)在 NPU 上的固有缺陷 | 等上游 |
+| FSDP/TP spawn 失败 | ~11 | 多进程分布式测试在多卡/容器环境下的偶发失败 | 观察 |
 | NPU 数值精度差异 + expectation 表缺 npu 条目 | ~40 | pipeline 分数差在小数第 4 位、`No matching expectation found for ('npu', None, None)` 等 | 逐个为 npu 补 expectation 或放宽容差(上游 PR 级工作) |
-| flaky / 上游抖动 | 若干 | 如 `test_length_warning_assisted_generation` 隔日翻转 | 观察 |
+| flaky / 上游抖动 | 若干 | 如 paligemma 可视化测试偶发下载卡死 2h+、`test_length_warning_assisted_generation` 隔日翻转 | 观察;必要时加 pytest-timeout |
 
 ## 4. CI 内建的特殊机制备忘
 
@@ -86,6 +89,7 @@ decord ×2(aarch64 无维护轮子)、detectron2 ×2(arm64 编译困难)、ONNXS
 | --- | --- | --- |
 | 上游 patch:get_device_properties | workflow `Patch upstream NPU bug` 步骤 | `testing_utils.py` 的 IS_NPU_SYSTEM 分支缺 `import torch`,精确字符串替换并断言唯一性 |
 | FA2 解锁插件 | workflow `Enable native-NPU FlashAttention-2 tests` 步骤 | 内联生成 `npu_fa2_unlock.py`,`PYTHONPATH` 注入,仅 NPU 生效,失败不阻塞 pytest |
+| NPU 修复插件 | workflow `Write NPU test fixes plugin` 步骤 | 内联生成 `npu_fixes.py`:①按 xdist worker 分配唯一 `MASTER_PORT`(29500+idx×1000)并设 `MASTER_ADDR/RANK/WORLD_SIZE/LOCAL_RANK`,让 deepspeed 走 env:// 路径(否则 mpi_discovery 硬编码 29500),消除 EADDRINUSE;②monkeypatch `HfDeepSpeedConfig.__init__` 注入缺失的 `train_micro_batch_size_per_gpu=1`,修复 qwen3.5 复合模型嵌套 `AutoModel.from_config` 的 zero3 config 断言 |
 | torchcodec 源码构建 | Install dependencies(common 分支) | torch 2.10 只配 torchcodec 0.10,而 0.10 无 linux-aarch64 轮子且无 sdist;0.13+cpu 需 torch≥2.11;PyPI 默认轮子是 CUDA 构建缺 libnvrtc。故仅 common job 从 GitHub tag `v0.10.0` 源码编译(装 FFmpeg 全套 dev 头 + cmake + ninja + pybind11 + pkg-config,设 `CMAKE_PREFIX_PATH` 指向 pybind11,`I_CONFIRM_THIS_IS_NOT_A_LICENSE_VIOLATION=1` 放行非 GPL 依赖),wheel 缓存于 `/root/.cache/wheels/torchcodec-torch2.10` 跨 run 复用,失败自动卸载回退 |
 | HF_TOKEN | job env `HF_TOKEN: ${{ secrets.HF_TOKEN }}` | 解锁 gated repo(gemma-3-1b-it 等)。账号需先在模型页接受许可协议 |
 | Coverage Watch | `coverage` job + `ci/check_coverage.py` | 看护顶层测试目录必须被 test_path 或 `ci/test_exclusions.txt` 覆盖,上游新增目录时强制人工确认(如 2026-08 新增的 `tests/pipeline_parallel` 已纳入 extra job) |
