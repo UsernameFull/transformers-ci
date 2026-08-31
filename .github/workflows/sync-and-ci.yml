@@ -407,6 +407,8 @@ jobs:
             -n 2 \
             --dist=loadfile \
             --random-order-bucket=module \
+            --timeout=1800 \
+            --timeout-method=signal \
             -rA \
             --junitxml=reports/junit_${{ matrix.name }}.xml \
             ${CI_TEST_PATH} \
