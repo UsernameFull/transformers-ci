@@ -364,6 +364,37 @@ jobs:
                   print("npu_fixes: HfDeepSpeedConfig batch-field patch installed")
               except Exception as exc:
                   print(f"npu_fixes: HfDeepSpeedConfig patch failed: {exc}")
+
+              try:
+                  import transformers.testing_utils as _tu
+
+                  _orig_find = _tu.Expectations.find_expectation
+
+                  def _find_with_npu_fallback(self, properties=("npu", None, None)):
+                      try:
+                          return _orig_find(self, properties)
+                      except ValueError:
+                          # NPU has no matching expectation entry (upstream only
+                          # ships cuda/xpu/rocm keys for many pipeline tests).
+                          # Fall back to the CUDA expectation (then rocm): NPU
+                          # aims for the same eager fp32 semantics, and the
+                          # assertion compares entity text plus rounded scores.
+                          for fallback_type in ("cuda", "rocm"):
+                              for key, value in self.data.items():
+                                  # packed keys unpack to (type, major, minor)
+                                  key_type = key[0] if isinstance(key, tuple) else None
+                                  if key_type == fallback_type:
+                                      print(
+                                          "npu_fixes: no npu expectation, "
+                                          f"falling back to {fallback_type}"
+                                      )
+                                      return value
+                          raise
+
+                  _tu.Expectations.find_expectation = _find_with_npu_fallback
+                  print("npu_fixes: Expectations NPU fallback patch installed")
+              except Exception as exc:
+                  print(f"npu_fixes: Expectations patch failed: {exc}")
           PY
 
       - name: Run tests
