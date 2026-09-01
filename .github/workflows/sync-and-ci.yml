@@ -316,6 +316,50 @@ jobs:
           import os
           import re
 
+          # Fix 3: prevent OOM-induced hangs. xdist workers + ASR/cache tests
+          # can exhaust the 60GB NPU; torch_npu then blocks on allocation and
+          # the job hangs past its timeout (seen: 37% stuck for 3h). After any
+          # OOM we release cached blocks before every test and skip tests while
+          # free memory is critically low instead of risking another hang.
+          _oom_seen = [False]
+
+          try:
+              import torch
+
+              def _free_and_skip_if_oom(item):
+                  if not (hasattr(torch, "npu") and torch.npu.is_available()):
+                      return
+                  try:
+                      torch.npu.empty_cache()
+                  except Exception:
+                      pass
+                  if _oom_seen[0]:
+                      try:
+                          free = torch.npu.mem_get_info()[0]
+                      except Exception:
+                          free = -1
+                      if 0 <= free < 2 * 1024**3:  # < 2 GiB free
+                          import pytest
+
+                          pytest.skip(
+                              "npu_fixes: NPU out of memory earlier; "
+                              "skipping to avoid allocation hang"
+                          )
+
+              def pytest_runtest_call(item):
+                  _free_and_skip_if_oom(item)
+
+              def pytest_runtest_makereport(item, call):
+                  if call.excinfo is not None:
+                      exc = call.excinfo.value
+                      if "out of memory" in str(exc).lower():
+                          _oom_seen[0] = True
+                          print("npu_fixes: OOM detected, enabling skip guard")
+
+              print("npu_fixes: OOM hang-guard hooks installed")
+          except Exception as exc:
+              print(f"npu_fixes: OOM guard hooks failed: {exc}")
+
 
           def pytest_configure(config):
               worker = os.environ.get("PYTEST_XDIST_WORKER", "gw0")
