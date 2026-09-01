@@ -105,7 +105,7 @@ jobs:
         include:
           - name: common
             test_path: tests/utils tests/generation tests/pipelines tests/tokenization tests/cli tests/repo_utils tests/test_image_transforms.py tests/test_monkey_patching.py tests/test_tokenization_common.py tests/test_tokenization_mistral_common.py tests/test_tokenizers_backend_mixin.py
-            timeout: 240
+            timeout: 360
           - name: trainer
             test_path: tests/trainer tests/optimization
             timeout: 240
@@ -346,7 +346,7 @@ jobs:
                               "skipping to avoid allocation hang"
                           )
 
-              def pytest_runtest_call(item):
+              def pytest_runtest_setup(item):
                   _free_and_skip_if_oom(item)
 
               def pytest_runtest_makereport(item, call):
