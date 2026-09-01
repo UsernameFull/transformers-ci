@@ -162,7 +162,7 @@ jobs:
           python -m pip install librosa ${EXTRA_PIP} \
             || echo "warning: librosa install failed (audio tests may skip)"
           python -m pip install \
-            timm av pyctcdecode IPython optuna pytesseract kernels schedulefree wandb \
+            timm av pyctcdecode IPython optuna pytesseract "kernels==0.16.0" schedulefree wandb \
             optimum-quanto galore_torch apollo_torch torch-optimi grokadamw peft
           python -m pip install bitsandbytes torchao liger-kernel "ray[tune]" lomo_optim hqq mpi4py \
             || echo "warning: some optional deps unavailable on aarch64"
