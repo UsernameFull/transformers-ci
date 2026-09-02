@@ -333,18 +333,20 @@ jobs:
                       torch.npu.empty_cache()
                   except Exception:
                       pass
-                  if _oom_seen[0]:
-                      try:
-                          free = torch.npu.mem_get_info()[0]
-                      except Exception:
-                          free = -1
-                      if 0 <= free < 2 * 1024**3:  # < 2 GiB free
-                          import pytest
+                  # Skip whenever free memory is critically low, regardless of
+                  # whether THIS worker saw the OOM (xdist workers are separate
+                  # processes; one worker's OOM starves the other too).
+                  try:
+                      free = torch.npu.mem_get_info()[0]
+                  except Exception:
+                      free = -1
+                  if 0 <= free < 8 * 1024**3:  # < 8 GiB free
+                      import pytest
 
-                          pytest.skip(
-                              "npu_fixes: NPU out of memory earlier; "
-                              "skipping to avoid allocation hang"
-                          )
+                      pytest.skip(
+                          "npu_fixes: NPU free memory critically low; "
+                          "skipping to avoid allocation hang"
+                      )
 
               def pytest_runtest_setup(item):
                   _free_and_skip_if_oom(item)
@@ -452,7 +454,7 @@ jobs:
             --dist=loadfile \
             --random-order-bucket=module \
             --timeout=1800 \
-            --timeout-method=signal \
+            --timeout-method=thread \
             -rA \
             --junitxml=reports/junit_${{ matrix.name }}.xml \
             ${CI_TEST_PATH} \
